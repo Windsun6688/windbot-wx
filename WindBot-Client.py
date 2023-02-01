@@ -1,8 +1,9 @@
 # -*- coding:utf-8 -*-
 
-import websocket,time,json,requests,os,rel,sqlite3,brotli,threading,objectpath
+import websocket,time,json,requests,os,rel,sqlite3,brotli,objectpath
 import random,string
 from datetime import datetime
+from threading import Thread
 from bs4 import BeautifulSoup
 websocket._logging._logger.level = -99
 
@@ -28,6 +29,7 @@ PERSONAL_DETAIL=6550
 DESTROY_ALL=9999
 STATUS_MSG=10000
 ATTATCH_FILE = 5003
+# 'type':49 带引用的消息
 
 '''Initialize Autohibernate'''
 undisturbed_hb = 0
@@ -36,8 +38,22 @@ undisturbed_hb = 0
 '''Admins'''
 OP_list = ['wxid_xd4gc9mu3stx12']
 
+############################# MULTITHREADING ################################
+class ThreadWithReturnValue(Thread):
+    
+    def __init__(self, group=None, target=None, name=None,
+                 args=(), kwargs={}, Verbose=None):
+        Thread.__init__(self, group, target, name, args, kwargs)
+        self._return = None
 
-# 'type':49 带引用的消息
+    def run(self):
+        if self._target is not None:
+            self._return = self._target(*self._args,**self._kwargs)
+
+    def join(self, *args):
+        Thread.join(self, *args)
+        return self._return
+
 ################################# OUTPUT&SQL ################################
 def getid():
 	return time.strftime("%Y%m%d%H%M%S")
@@ -196,6 +212,15 @@ def sql_destroy(db,table):
 	db.execute(destroy_txt)
 	db.commit()
 
+def sql_delete(db,table,condition = None):
+	if not condition:
+		output('Did not specify which delete condition.','WARNING',background = "WHITE")
+		return ['-1']
+
+	delete_txt = f"DELETE FROM {table} WHERE {condition}"
+	db.execute(delete_txt)
+	db.commit()
+
 ################################### HTTP ####################################
 def send(uri,data):
 	base_data={
@@ -291,6 +316,7 @@ def handle_memberlist(j):
 
 		for m in members:
 			sql_insert(conn,cur,f'r{room_num}',['wxid'],[m])
+			sql_insert(conn,cur,'Users',['wxid'],[m])
 			ws.send(get_chat_nick_p(m,room_num))
 
 def get_personal_detail(wxid):
@@ -332,6 +358,7 @@ def handle_wxuser_list(j):
 
 		if item['wxid'][-8:] == 'chatroom':
 			sql_insert(conn,cur,'Groupchats',['roomid','groupname'],[item['wxid'][:-9],item['name']])
+			sql_update(conn,'Groupchats','groupname',item['name'],f"roomid = '{item['wxid'][:-9]}'")
 		else:
 			sql_insert(conn,cur,'Users',['wxid','wxcode','realUsrName'],[item['wxid'],item['wxcode'],item['name']])
 
@@ -374,12 +401,17 @@ def sql_initialize_group(roomid):
 	conn.execute(initialize_group)
 	conn.commit()
 
-def sql_initialize_link(linkroomid):
+def sql_initialize_link(linkroomid,allselect):
 	initialize_link = f'''CREATE TABLE IF NOT EXISTS {linkroomid}
 			(wxid TEXT,
 			arcID NUMBER,
+			allselect NUMBER NOT NULL DEFAULT {allselect},
+			songselect NUMBER NOT NULL DEFAULT 0,
+			song TEXT NOT NULL DEFAULT -1,
+			chartLevel NUMBER NOT NULL DEFAULT -1,
+			songStarted NUMBER NOT NULL DEFAULT -1,
 			isOwner NUMBER NOT NULL DEFAULT 0);'''
-	# print(initialize_users)
+	# output(initialize_link)
 	conn.execute(initialize_link)
 	conn.commit()
 	output(f'Created Link Play Room of ID {linkroomid}','CREATE_LINK',background = 'WHITE')
@@ -557,7 +589,10 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'stoplink':arc_link_destroy,
 		'signup':arc_signup,
 		'search': search,
-		# 'random': random_song,
+		'linkselect': arc_link_select,
+		'linkstart': arc_link_start,
+		'quitlink': arc_link_quit,
+		'random': arc_random
 	}
 	'''
 	Terminal Log
@@ -572,20 +607,16 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	'''
 	real_data = call_data[1:]
 	send_function = send_msg
-	backup_function = None
 
-	# Best Init feedback
+	# Best XX Function runs on a single thread
 	if call_data[0] == 'best':
 		ws.send(send_msg('这可能需要一会,请耐心等待。',destination))
-		send_function = send_attatch
-		backup_function = send_msg
-
+		tbest = Thread(target=arc_best,args = (real_data,callerid,destination))
+		tbest.start()
+		return
 	try:
 		ansList = functions.get(call_data[0].lower())(real_data,callerid,destination)
 		ws.send(send_function(ansList[0],destination))
-		if backup_function:
-			if ansList[1]:
-				ws.send(backup_function(ansList[1],destination))
 
 	except Exception as e:
 		output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
@@ -656,12 +687,16 @@ def handle_recv_msg(msgJson):
 		else:
 			help_txt = open('WindBotHelpDM.txt','r').read()
 		ws.send(send_msg(f'{help_txt}',wxid = msgJson['wxid']))
+	elif keyword == 'linkhelp':
+		help_txt = open('WindBotHelpLink.txt','r').read()
+		ws.send(send_msg(f'{help_txt}',wxid = msgJson['wxid']))
+
 	elif keyword=='ding':
 		ws.send(send_msg('dong',wxid=msgJson['wxid']))
 	elif keyword=='dong':
 		ws.send(send_msg('ding',wxid=msgJson['wxid']))
 	elif keyword == '6':
-		ws.send(send_msg('别人都发666，就你只发一个6，就像一家三口你起码少两个',wxid=msgJson['wxid']))
+		ws.send(send_msg('WB很不喜欢敷衍的但走一个6哦',wxid=msgJson['wxid']))
 
 ######################### ON MSG SWITCH #####################################
 def on_message(ws,message):
@@ -768,7 +803,7 @@ def arc_recent(datalist,callerid,roomid = None):
 	if userid == -1:
 		return ['您未绑定ArcaeaID。请使用Bind指令绑定。']
 
-	wsarc.send(str(userid))
+	wsarc.send(f"{userid} -1 -1")
 	# output('sent')
 	buffer = ""
 	scores = []
@@ -783,9 +818,11 @@ def arc_recent(datalist,callerid,roomid = None):
 		if type(buffer) == type(b''):
 			# print("recv")
 			obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
+			# output(obj)
 			# al.append(obj)
 			if obj['cmd'] == 'userinfo':
 				userinfo = obj['data']
+				name = userinfo['name']
 				recent_song = userinfo['recent_score'][0]
 
 				# output('---------')
@@ -814,32 +851,37 @@ def arc_recent(datalist,callerid,roomid = None):
 				else:
 					answer_txt = f"Recent Play:\n{artist} - {en_name} ({diff} {constant})\n{score} {cleartype} ({best_cleartype})\nPerfect: {perfect}({shiny_p})\nFar: {far}\nMiss: {miss}\nRating: %.3f" % single_rating
 
-				return [answer_txt,score]
-	return ['Some Error happened.']
+				return [answer_txt,score,name]
+	return['出现了一些问题。']
 
 def cmp(a):
 	return a['rating']
 
 def arc_best(datalist,callerid,roomid = None):
+	conn_thread = sqlite3.connect('./windbotDB.db')
+	cur_thread = conn_thread.cursor()
+
 	clear_list = ['Track Lost', 'Normal Clear', 'Full Recall', 'Pure Memory', 'Easy Clear', 'Hard Clear']
 	diff_list = ['PST', 'PRS', 'FTR', 'BYD']
 
 	wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
 
-	userid = sql_fetch(cur,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
+	userid = sql_fetch(cur_thread,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
 	# output(userid)
 
 	if userid == -1:
 		return ['','您未绑定ArcaeaID。请使用Bind指令绑定。']
-
-	wsarc.send(str(userid))
-
 	try:
 		num = int(datalist[0])
 	except Exception as e:
 		return ['','请指明有效获取数。']
 	if num < 1 or num > 50:
 		return ['','请指明有效获取数。']
+
+	if len(datalist) > 1:
+		userid = datalist[1]
+
+	wsarc.send(str(userid))
 
 	buffer = ""
 	scores = []
@@ -858,7 +900,7 @@ def arc_best(datalist,callerid,roomid = None):
 
 		if type(buffer) == type(b''):
 			obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
-			# output(obj)
+			output(obj)
 			# al.append(obj)
 			if obj['cmd'] == 'songtitle':
 				song_title = obj['data']
@@ -873,7 +915,7 @@ def arc_best(datalist,callerid,roomid = None):
 
 	scores.sort(key=cmp, reverse=True)
 
-	output('正在整理')	
+	output('数据已拿全,正在整理')	
 
 	output_file.write("%s's Top %d Songs:\n" % (userinfo['name'], num))
 	for j in range(0, int((num - 1) / 15) + 1):
@@ -885,16 +927,11 @@ def arc_best(datalist,callerid,roomid = None):
 			except IndexError:
 				break
 			output_file.write("#%d  %s  %s %.1f  \n\t%s\n\tPure: %d(%d)\n\tFar: %d\n\tLost: %d\n\tScore: %d\n\tRating: %.2f\n" % (i+1, song_title[score['song_id']]['en'], diff_list[score['difficulty']], score['constant'], clear_list[score['clear_type']],score["perfect_count"], score["shiny_perfect_count"], score["near_count"], score["miss_count"], score["score"], score["rating"]))
-	# ws.send(send_attatch(f"./{userinfo['name']}.txt"))
-	# return [f"./Best/{userinfo['name']} Best.txt"]
-	return [f"C:\\users\\Public\\Best\\{userinfo['name']} Best.txt",'']
-	# return ['已完成。']
+
+	ws.send(send_attatch(f"C:\\users\\Public\\Best\\{userinfo['name']} Best.txt",roomid))
 
 def whatis(datalist,callerid,roomid = None):
 	result = sql_fetch(arcur,'alias',['sid'],f"alias = '{datalist[0]}'")
-	# result = sql_match(arcdb,arcur,'alias',['sid'],'alias',f'{datalist[0]}')
-
-	# output(result)
 
 	res_len = len(result)
 
@@ -1033,9 +1070,9 @@ def search(datalist,callerid,roomid = None):
 			bg_txt = None
 
 		if jp_name:
-			reply_txt += f"{artist} - {en_name}({jp_name}), BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, 封面绘师{jacket_designer}{bg_txt}\n"
+			reply_txt += f"{artist} - {en_name}({jp_name}), BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, {world_unlock}爬梯获得, 封面绘师{jacket_designer}{bg_txt}\n"
 		else:
-			reply_txt += f"{artist} - {en_name}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, 封面绘师{jacket_designer}{bg_txt}\n"
+			reply_txt += f"{artist} - {en_name}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, {world_unlock}爬梯获得, 封面绘师{jacket_designer}{bg_txt}\n"
 
 		difficulty_cnt = len(song_detail)
 
@@ -1050,16 +1087,7 @@ def search(datalist,callerid,roomid = None):
 			total_time = byd_detail[8]
 			mins = total_time // 60
 			secs = total_time - mins*60
-			difficulty = byd_detail[15]
-
-			#处理 9+, 10+
-			if difficulty % 2 != 0:
-				if difficulty//2 == 9:
-					difficulty = '9+'
-				else:
-					difficulty = '10+'
-			else:
-				difficulty = str(int(difficulty/2))
+			difficulty = int(byd_detail[16])/10
 
 			note_cnt = byd_detail[17]
 			charter = byd_detail[18].replace('\n',' ')
@@ -1079,16 +1107,7 @@ def search(datalist,callerid,roomid = None):
 			chart_detail = song_detail[chart_diff]
 			# output(chart_detail)
 			diff_level = diff_list[chart_diff]
-			difficulty = chart_detail[15]
-
-			#处理 9+, 10+
-			if difficulty % 2 != 0:
-				if difficulty//2 == 9:
-					difficulty = '9+'
-				else:
-					difficulty = '10+'
-			else:
-				difficulty = str(int(difficulty/2))
+			difficulty = int(chart_detail[16])/10
 
 			note_cnt = chart_detail[17]
 			charter = chart_detail[18].replace('\n',' ')
@@ -1110,8 +1129,16 @@ def arc_link(datalist,callerid,roomid = None):
 	if user_arcID == -1:
 		return ['您未绑定ArcaeaID。请使用Bind指令绑定。']
 
+	allselect = -1
+
+	if len(datalist) > 0:
+		if datalist[0] == 'a' or datalist[0] == 'all':
+			allselect = 1
+		else:
+			return[f'没有为{datalist[0]}的模式。']
+
 	room_id = arc_room_id()
-	sql_initialize_link(room_id)
+	sql_initialize_link(room_id,allselect)
 	ws.send(send_msg(f'您的房间号是:',roomid))
 	time.sleep(0.3)
 	ws.send(send_msg(f'{room_id}',roomid))
@@ -1127,14 +1154,19 @@ def arc_signup(datalist,callerid,roomid = None,isOwner = None):
 		return ['您未绑定ArcaeaID。请使用Bind指令绑定。']
 
 	link_room_id = datalist[0]
-
 	if isOwner:
 		isOwner = 1
+		can_select = 1
 	else:
 		isOwner = 0
+		can_select = -1	
+
+		is_all = sql_fetch(cur,link_room_id,['allselect'])
+		if is_all[0][0] == 1:
+			can_select = 1
 
 	try:
-		sql_insert(conn,cur,link_room_id,['wxid','arcID','isOwner'],[callerid,user_arcID,isOwner])
+		sql_insert(conn,cur,link_room_id,['wxid','arcID','songselect','isOwner'],[callerid,user_arcID,can_select,isOwner])
 	except Exception as e:
 		return ['房间号错误或不存在。']
 
@@ -1144,11 +1176,17 @@ def arc_signup(datalist,callerid,roomid = None,isOwner = None):
 	return [f'加入成功。目前房间内有{link_player_cnt}人。']
 
 def arc_link_destroy(datalist,callerid,roomid = None):
-	link_room_id = datalist[0]
-	try:
-		user_is_owner = sql_fetch(cur,link_room_id,['isOwner'],f"wxid = '{callerid}'")
-	except Exception as e:
+	if len(datalist) == 0:
+		link_room_id = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
+		if link_room_id == '-1':
+			return ['您不在房间中。']
+	else:
+		link_room_id = datalist[0]
+
+	user_is_owner = sql_fetch(cur,link_room_id,['isOwner'],f"wxid = '{callerid}'")
+	if len((user_is_owner)) == 0:
 		return ['出现错误。可能是房间ID输入错误。']
+	user_is_owner = user_is_owner[0][0]
 
 	user_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")[0][0]
 
@@ -1166,9 +1204,192 @@ def arc_link_destroy(datalist,callerid,roomid = None):
 	output(f'Stopped Link Play Room of ID {link_room_id}','STOP_LINK',background = "WHITE")
 	return ['房间已结束。']	
 
-def arc_link_select(datalist,callerid,roomid = None):
-	user_is_owner = sql_fetch(cur,link_room_id,['isOwner'],f"wxid = '{callerid}'")
+def arc_link_select(datalist,callerid,roomid):
+	link_room_id = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
+	if link_room_id == '-1':
+		return['您不在房间中。']
 
+	user_can_select = sql_fetch(cur,link_room_id,['songselect'],f"wxid = '{callerid}'")[0]
+	if user_can_select[0] != 1:
+		return ['您没有选择歌曲的权限。']
+
+	song_started = sql_fetch(cur,link_room_id,['songStarted'])[0][0]
+	if song_started == 1:
+		return ['已有进行中的歌曲。']
+
+	if len(datalist) < 2:
+		return['请指明歌曲难度。']
+
+	diff_lvl = {
+		'PST': 0,
+		'PRS': 1,
+		'FTR': 2,
+		'BYD': 3
+	}
+
+	keyword = datalist[0]
+	selected_song = sql_fetch(arcur,'charts',condition = f"name_en = '{keyword}'")
+
+	if len(selected_song) == 0:
+		sid = whatis([f"{keyword}"],callerid)[1]
+		if sid == -1:
+			return['没有找到相关歌曲。']
+	else:
+		sid = selected_song[0][0]
+
+	if len(selected_song) > 4:
+		ws.send(send_msg('啊哈 是重名歌曲 默认选Quon(Lanota)哦\n选Quon(wacca)的话直接说quon2 我懒（',roomid))
+
+	try:
+		chart_diff = diff_lvl.get(datalist[1].upper())
+		# output(chart_diff)
+		chart_detail = sql_fetch(arcur,'charts',condition = f"song_id = '{sid}' AND rating_class = {chart_diff}")
+		if len(chart_detail) == 0:
+			return ['没有该难度。']
+	except Exception as e:
+		return ['没有该难度。']
+
+	level = chart_detail[0]
+	en_name = level[2]
+	jp_name = level[3]
+	artist = level[4]
+	charter = level[18].replace('\n',' ')
+
+	sql_update(conn,link_room_id,'song',sid)
+	sql_update(conn,link_room_id,'chartLevel',chart_diff)
+
+	if jp_name:
+		reply_txt = f'已选择歌曲: {artist} - {en_name}({jp_name}) \n难度: {datalist[1]} 谱师: {charter}'
+	else:
+		reply_txt = f'已选择歌曲: {artist} - {en_name} \n难度: {datalist[1]} 谱师: {charter}'
+	return [reply_txt]
+
+def arc_link_start(datalist,callerid,roomid = None):
+	link_room_id = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
+	if link_room_id == '-1':
+		return ['您不在房间中。']
+
+	user_can_start = sql_fetch(cur,link_room_id,['songselect'],f"wxid = '{callerid}'")[0][0]
+
+	if user_can_start != 1:
+		return ['您没有权限开始。']
+
+	song = sql_fetch(cur,link_room_id,['song'])[0][0]
+	if song == '-1':
+		return ['没有选择歌曲。']
+
+	song_started = sql_fetch(cur,link_room_id,['songStarted'])[0][0]
+	if song_started == 1:
+		return ['已有进行中的歌曲。']
+
+	ws.send(send_msg('歌曲将在5秒钟后开始。',roomid))
+
+	t = Thread(target=arc_link_results,args = (link_room_id,roomid))
+	t.start()
+	sql_update(conn,link_room_id,'songStarted',1)
+	time.sleep(5)
+
+	return ['已开始计时。']
+
+def arc_link_results(link_room_id,destination):
+	conn_thread = sqlite3.connect('./windbotDB.db')
+	cur_thread = conn_thread.cursor()
+
+	arcdb_thread = sqlite3.connect('./arcsong.db')
+	arcur_thread = arcdb_thread.cursor()
+
+	players = [p[0] for p in sql_fetch(cur_thread,link_room_id,['arcID'])]
+
+	link_song = sql_fetch(cur_thread,link_room_id,['song'])[0][0]
+	song_level = sql_fetch(cur_thread,link_room_id,['chartLevel'])[0][0]
+
+	chart_detail = sql_fetch(arcur_thread,'charts',condition = f"song_id = '{link_song}' AND rating_class = {song_level}")[0]
+	link_time = chart_detail[8]
+	results = {}
+	reply_txt = "下面是结果！\n"
+
+	# output(players)
+	# output(link_time)
+
+	time.sleep(link_time+25)
+
+	wsarc_thread = websocket.create_connection("wss://arc.estertion.win:616/")
+	for p in players:
+		wsarc_thread.send(f"{p} -1 -1")
+		buffer = ""
+		scores = []
+		userinfo = {}
+		song_title = {}
+		while buffer != "bye":
+			try:
+				buffer = wsarc_thread.recv()
+			except websocket._exceptions.WebSocketConnectionClosedException:
+				wsarc_thread = websocket.create_connection("wss://arc.estertion.win:616/")
+				wsarc_thread.send(f"{p} -1 -1")
+			if type(buffer) == type(b''):
+				obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
+				# output(obj)
+				if obj['cmd'] == 'userinfo':
+					userinfo = obj['data']
+					name = userinfo['name']
+
+					recent_song = userinfo['recent_score'][0]
+
+					sid = recent_song['song_id']
+					diff = recent_song['difficulty']
+					score = recent_song['score']
+
+					if sid == link_song and diff == song_level:
+						results[name] = score
+					else:
+						results[name] = -1
+	i = 1
+	for p,s in sorted(results.items(), key=lambda p:p[1]):
+		reply_txt += f"{i}位！ {p} {s}\n"
+
+	ws.send(send_msg(reply_txt,destination))
+	sql_update(conn_thread,link_room_id,'songStarted',0)
+
+def arc_link_quit(datalist,callerid,roomid):
+	link_room_id = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
+	if link_room_id == '-1':
+		return ['您不在房间中。']
+
+	song_started = sql_fetch(cur,link_room_id,['songStarted'])[0][0]
+	if song_started == 1:
+		return ['歌曲正在进行中。']
+
+	link_player_cnt = len(sql_fetch(cur,link_room_id,['wxid']))
+	if link_player_cnt == 1:
+		arc_link_destroy([link_room_id],OP_list[0],roomid)
+		return['最后一位玩家退出房间。已结束房间。']
+
+	sql_delete(conn,link_room_id,f"wxid = '{callerid}'")
+	return ['您已退出房间。']
+
+def arc_random(datalist,callerid,roomid):
+	if len(datalist) < 1:
+		return ['请指明随机歌曲难度。']
+	diff = float(datalist[0]) * 10
+	songs = sql_fetch(arcur,'charts',condition = f"rating = {diff}")
+
+	if len(songs) == 0:
+		return ['该难度没有歌曲。']
+
+	random_id = random.randint(0,len(songs)-1)
+
+	chart_detail = songs[random_id]
+
+	en_name = chart_detail[2]
+	jp_name = chart_detail[3]
+	artist = chart_detail[4]
+
+	if jp_name:
+		reply_txt = f"随机到的歌曲是:\n{artist} - {en_name}({jp_name})"
+	else:
+		reply_txt = f"随机到的歌曲是:\n{artist} - {en_name}"
+
+	return [reply_txt]
 
 ########################## MANAGING FUNCTIONS ##############################
 
@@ -1194,7 +1415,7 @@ def ban(datalist,callerid,roomid):
 				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
 				continue
 		if wxid in OP_list:
-			ws.send(send_msg('不建议ban了WDS的权限捏',roomid))
+			ws.send(send_msg('不建议ban了WDS捏',roomid))
 			continue
 		cnt += 1
 		# output(wxid)
@@ -1295,9 +1516,10 @@ def punch(datalist,callerid,roomid = None):
 	return[f'应取消{len(datalist)}人,实取消{cnt}人,下班']
 
 def setsuper(datalist,callerid,roomid = None):
-	ws.send(send_msg('NEVER GONNA GIVE YOU UP\n BUT I AM GONNA LET YOU DOWN\nSAY GOODBYE',roomid))
-	ban([callerid],'wxid_xd4gc9mu3stx12')
-	punch([callerid],'wxid_xd4gc9mu3stx12')
+	ws.send(send_msg('NEVER GONNA GIVE YOU UP\nBUT I AM GONNA LET YOU DOWN\nSAY GOODBYE',roomid))
+	ban([callerid],'wxid_xd4gc9mu3stx12',roomid)
+	punch([callerid],'wxid_xd4gc9mu3stx12',roomid)
+	return['LOL']
 
 ################################ MAIN #######################################
 if __name__ == "__main__":

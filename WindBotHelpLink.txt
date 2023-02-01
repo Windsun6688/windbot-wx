@@ -1,0 +1,20 @@
+Commands:
+
+link [ |a]
+  -新建link房间 带a房间内全员可选曲/开始 您为Owner
+stoplink [ |roomid]
+  -结束link房间 默认结束您为Owner的房间 可带roomid结束指定房间
+signup [roomid]
+  -加入房间号为roomid的link房间
+linkselect [title|alias] [difficulty]
+  -选择歌曲
+linkstart
+  -开始歌曲 WB会在歌曲结束后自动爬取房内成员分数并返回排行榜
+quitlink
+  -退出您所在的房间
+
+Example Usage:
+ @Windbot link a
+ @Windbot signup LRnvgngyu
+ @Windbot linkselect 造书者 BYD
+ @Windbot linkstart
