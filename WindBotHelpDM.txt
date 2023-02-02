@@ -17,8 +17,8 @@ whatis [alias]
   -这是阿卡伊里的哪首歌？
 whocharted [title] [difficulty]
   -查询Arcaea谱面作者
-best [count]
-  -查询您绑定的ArcID的best XX
+b[count] [|arcID]
+  -查询您绑定的ArcID或指定ID的bXX
 search [ |f] [title(alias)]
   -查询Arcaea曲目 默认精确搜索 带f调用模糊搜索
 random [level]
