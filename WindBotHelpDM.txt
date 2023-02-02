@@ -1,5 +1,5 @@
 Usage:
-  @Windbot <command> [options]
+  WB <command> [options]
 
 Commands:
 
@@ -9,30 +9,27 @@ patstat
   -你拍了我多少次（
 friday
   -Is today Friday in California?
-arclookup [gamertag]
-  -显示Arcaea玩家的好友码和PTT
+arclookup [username]
+  -显示Arcaea玩家的UID和PTT
 arcrecent
-  -显示您最近一次游玩Arcaea的结果
+  -显示Arcaea玩家最近一次游玩结果
 whatis [alias]
   -这是阿卡伊里的哪首歌？
-whocharted [title(alias)] [difficulty]
+whocharted [title] [difficulty]
   -查询Arcaea谱面作者
+best [count]
+  -查询您绑定的ArcID的best XX
 search [ |f] [title(alias)]
   -查询Arcaea曲目 默认精确搜索 带f调用模糊搜索
-b[count] [|arcID]
-  -查询您绑定的ArcID或指定ID的bXX
 random [level]
   -Play like you never did before
 
 Keywords:
 
-linkhelp
-  -显示关于WindBot阿卡伊link房间的help
 help
   -显示这些文字
 
 Example Usage:
- @WindBot bind 605169141
- @WindBot b25
- @WindBot random 10.7
- @WindBot search 猫光
+ WB bind 605169141
+ WB best 30
+ WB whatis 猫光
