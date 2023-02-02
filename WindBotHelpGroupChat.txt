@@ -19,8 +19,8 @@ whocharted [title(alias)] [difficulty]
   -查询Arcaea谱面作者
 search [ |f] [title(alias)]
   -查询Arcaea曲目 默认精确搜索 带f调用模糊搜索
-best [count] [|arcID]
-  -查询您绑定的ArcID或指定ID的best XX
+b[count] [|arcID]
+  -查询您绑定的ArcID或指定ID的bXX
 random [level]
   -Play like you never did before
 
@@ -33,6 +33,6 @@ help
 
 Example Usage:
  @WindBot bind 605169141
- @WindBot best 30
+ @WindBot b25
  @WindBot random 10.7
  @WindBot search 猫光
