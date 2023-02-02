@@ -34,7 +34,6 @@ ATTATCH_FILE = 5003
 '''Initialize Autohibernate'''
 undisturbed_hb = 0
 
-
 '''Admins'''
 OP_list = ['wxid_xd4gc9mu3stx12']
 
@@ -567,6 +566,7 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		return
 
 	call_data = keyword.split(' ')
+	#handle mobile @
 	if len(call_data) > 1 and call_data[0] == '':
 		call_data = call_data[1:]
 
@@ -578,7 +578,6 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'arcrecent': arc_recent,
 		'friday': today_is_friday_in_california,
 		'whocharted': whocharted,
-		'best': arc_best,
 		'ban': ban,
 		'unban':unban,
 		'refresh': refresh,
@@ -609,11 +608,14 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	send_function = send_msg
 
 	# Best XX Function runs on a single thread
-	if call_data[0] == 'best':
+	if call_data[0][0] == 'b' and call_data[0][1:].isdigit():
+		real_data = call_data[1:]
+		real_data.insert(0,int(call_data[0][1:]))
 		ws.send(send_msg('这可能需要一会,请耐心等待。',destination))
 		tbest = Thread(target=arc_best,args = (real_data,callerid,destination))
 		tbest.start()
 		return
+
 	try:
 		ansList = functions.get(call_data[0].lower())(real_data,callerid,destination)
 		ws.send(send_function(ansList[0],destination))
@@ -730,7 +732,6 @@ def on_message(ws,message):
 	# output('on message ok')
 
 ############################# FUNCTIONS #####################################
-
 def bindID(datalist,callerid,roomid = None):
 	bindapp = {
 		'arc': 'arcID',
@@ -867,16 +868,19 @@ def arc_best(datalist,callerid,roomid = None):
 	wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
 
 	userid = sql_fetch(cur_thread,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
-	# output(userid)
+	output(f"Fetching best for {userid}")
 
 	if userid == -1:
-		return ['','您未绑定ArcaeaID。请使用Bind指令绑定。']
+		ws.send(send_msg('您未绑定ArcaeaID。请使用Bind指令绑定。',roomid))
+		return
 	try:
 		num = int(datalist[0])
 	except Exception as e:
-		return ['','请指明有效获取数。']
-	if num < 1 or num > 50:
-		return ['','请指明有效获取数。']
+		ws.send(send_msg('请指明有效获取数。',roomid))
+		return
+	if num < 1 or num > 100:
+		ws.send(send_msg('非有效获取数。',roomid))
+		return
 
 	if len(datalist) > 1:
 		userid = datalist[1]
@@ -890,28 +894,30 @@ def arc_best(datalist,callerid,roomid = None):
 	count = 0
 
 	while buffer != "bye":
-		# output('got buffer')
+		# output('got buWffer')
 		try:
 			buffer = wsarc.recv()
 		except websocket._exceptions.WebSocketConnectionClosedException:
-			return ['',f'查分服务器关闭了链接。\n这可能是用户绑定错误ID导致，也可能是网络原因。\n您现在绑定的arcID: {userid}']
-			# wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
-			# wsarc.send(str(userid))
+			ws.send(send_msg(f'查分服务器关闭了链接。\n这可能是用户绑定错误ID导致，也可能是网络原因。\n您现在绑定的arcID: {userid}',roomid))
+			return
 
 		if type(buffer) == type(b''):
 			obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
-			output(obj)
+			# output(obj)
 			# al.append(obj)
 			if obj['cmd'] == 'songtitle':
 				song_title = obj['data']
 			elif obj['cmd'] == 'scores':
+				count += 1
 				scores += obj['data']
+				if count % 10 == 0:
+					output(f'Got {count} songs.')
 			elif obj['cmd'] == 'userinfo':
 				userinfo = obj['data']
 				#Put In WINDOWS LOCATION
-
 				output_file = open("/Users/windsun/Library/Application Support/CrossOver/Bottles/WechatServer/drive_c/users/Public/Best/%s Best.txt" % userinfo['name'],'w')
 				# output_file = open("./Best/%s Best.txt" % userinfo['name'],'w')
+
 
 	scores.sort(key=cmp, reverse=True)
 
@@ -1241,7 +1247,8 @@ def arc_link_select(datalist,callerid,roomid):
 		ws.send(send_msg('啊哈 是重名歌曲 默认选Quon(Lanota)哦\n选Quon(wacca)的话直接说quon2 我懒（',roomid))
 
 	try:
-		chart_diff = diff_lvl.get(datalist[1].upper())
+		given_diff = datalist[1].upper()
+		chart_diff = diff_lvl.get(given_diff)
 		# output(chart_diff)
 		chart_detail = sql_fetch(arcur,'charts',condition = f"song_id = '{sid}' AND rating_class = {chart_diff}")
 		if len(chart_detail) == 0:
@@ -1259,9 +1266,9 @@ def arc_link_select(datalist,callerid,roomid):
 	sql_update(conn,link_room_id,'chartLevel',chart_diff)
 
 	if jp_name:
-		reply_txt = f'已选择歌曲: {artist} - {en_name}({jp_name}) \n难度: {datalist[1]} 谱师: {charter}'
+		reply_txt = f'已选择歌曲: {artist} - {en_name}({jp_name}) \n难度: {given_diff} 谱师: {charter}'
 	else:
-		reply_txt = f'已选择歌曲: {artist} - {en_name} \n难度: {datalist[1]} 谱师: {charter}'
+		reply_txt = f'已选择歌曲: {artist} - {en_name} \n难度: {given_diff} 谱师: {charter}'
 	return [reply_txt]
 
 def arc_link_start(datalist,callerid,roomid = None):
@@ -1313,8 +1320,8 @@ def arc_link_results(link_room_id,destination):
 
 	time.sleep(link_time+25)
 
-	wsarc_thread = websocket.create_connection("wss://arc.estertion.win:616/")
 	for p in players:
+		wsarc_thread = websocket.create_connection("wss://arc.estertion.win:616/")
 		wsarc_thread.send(f"{p} -1 -1")
 		buffer = ""
 		scores = []
@@ -1369,9 +1376,10 @@ def arc_link_quit(datalist,callerid,roomid):
 
 def arc_random(datalist,callerid,roomid):
 	if len(datalist) < 1:
-		return ['请指明随机歌曲难度。']
-	diff = float(datalist[0]) * 10
-	songs = sql_fetch(arcur,'charts',condition = f"rating = {diff}")
+		songs = list(set(sql_fetch(arcur,'charts')))
+	else:
+		diff = float(datalist[0]) * 10
+		songs = sql_fetch(arcur,'charts',condition = f"rating = {diff}")
 
 	if len(songs) == 0:
 		return ['该难度没有歌曲。']
@@ -1392,7 +1400,6 @@ def arc_random(datalist,callerid,roomid):
 	return [reply_txt]
 
 ########################## MANAGING FUNCTIONS ##############################
-
 def ban(datalist,callerid,roomid):
 	# output(datalist)
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
