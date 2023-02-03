@@ -108,8 +108,8 @@ def sql_insert(db,dbcur,table,rows,values):
 	Pre-Process
 	'''
 	# table = f'r{table[:-9]}'
-	test_row = rows[0]
-	test_value = values[0]
+	test_row = rows[-1]
+	test_value = values[-1]
 	rows = str(rows)[1:-1].replace('\'','')
 	values = str(values)[1:-1]
 	'''
@@ -128,7 +128,7 @@ def sql_insert(db,dbcur,table,rows,values):
 	'''
 	if result:
 		# output('Skipping This Insert Because Column Exists','WARNING')
-		pass
+		return
 	else:
 		insert_txt = f"INSERT INTO {table}({rows}) VALUES({values})"
 		# print(insert_txt)
@@ -184,7 +184,6 @@ def sql_match(db,dbcur,table,cols = ['*'],conditionCol = None,keyword = None):
 	fetchcols_str = str(fetchcols)[1:-1].replace('\'','')
 
 	dbcur.execute(f'create virtual table fuzzysearch using fts5({fetchcols_str}, tokenize="porter unicode61");')
-
 
 	for row in origin_data:
 		# output(str(row)[1:-1])
@@ -512,9 +511,12 @@ def handle_sent_msg(msgJson):
 	output(msgJson['content'],mode = 'HIGHLIGHT')
 
 def handleMsg_cite(msgJson):
-	# 处理带引用的文字消息
+	# 处理带引用的文字消息和转发链接
 	msgXml=msgJson['content']['content'].replace('&amp;','&').replace('&lt;','<').replace('&gt;','>')
 	soup=BeautifulSoup(msgXml,features="xml")
+	if soup.appname.string == '哔哩哔哩':
+		output(f'Video from BiliBili: {soup.title.string} URL: {soup.url.string}')
+		return
 	# print(soup.prettify())
 	refmsg = [child for child in soup.refermsg.strings if child != '\n']
 	# output(refmsg)
@@ -577,7 +579,6 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'patstat': patstat,
 		'arcrecent': arc_recent,
 		'friday': today_is_friday_in_california,
-		'whocharted': whocharted,
 		'ban': ban,
 		'unban':unban,
 		'refresh': refresh,
@@ -591,7 +592,11 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'linkselect': arc_link_select,
 		'linkstart': arc_link_start,
 		'quitlink': arc_link_quit,
-		'random': arc_random
+		'random': arc_random,
+		'chartdetail': chartdetail,
+		'grablevel': grablevel,
+		'constable': constable,
+		'addalias': addalias
 	}
 	'''
 	Terminal Log
@@ -616,13 +621,18 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		tbest.start()
 		return
 
+	if call_data[0].lower() not in functions.keys():
+		output('Called non-existent function','WARNING',background = 'WHITE')
+		ws.send(send_msg('没有该指令。',destination))
+		return
+
 	try:
 		ansList = functions.get(call_data[0].lower())(real_data,callerid,destination)
 		ws.send(send_function(ansList[0],destination))
-
 	except Exception as e:
+		output(type(e))
 		output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
-		ws.send(send_msg('出错了＿|￣|○\n请尝试检查指令，调用help或把WDS@出来',destination))
+		ws.send(send_msg('出错了＿|￣|○\n请尝试检查指令参数，调用help或把WDS@出来',destination))
 
 	# ws.send(send_msg('收到调用',dest))
 
@@ -685,26 +695,25 @@ def handle_recv_msg(msgJson):
 	'''
 	if keyword == 'help':
 		if roomid:
-			help_txt = open('WindBotHelpGroupChat.txt','r').read()
+			ws.send(send_attatch('C:\\users\\public\\Help\\WindbotHelpGC.jpg',msgJson['wxid']))
 		else:
 			help_txt = open('WindBotHelpDM.txt','r').read()
-		ws.send(send_msg(f'{help_txt}',wxid = msgJson['wxid']))
+			ws.send(send_msg(f'{help_txt}',wxid = msgJson['wxid']))
 	elif keyword == 'linkhelp':
-		help_txt = open('WindBotHelpLink.txt','r').read()
-		ws.send(send_msg(f'{help_txt}',wxid = msgJson['wxid']))
-
+		ws.send(send_attatch('C:\\users\\public\\Help\\WindbotLinkHelp.jpg',msgJson['wxid']))
 	elif keyword=='ding':
 		ws.send(send_msg('dong',wxid=msgJson['wxid']))
 	elif keyword=='dong':
 		ws.send(send_msg('ding',wxid=msgJson['wxid']))
 	elif keyword == '6':
-		ws.send(send_msg('WB很不喜欢敷衍的但走一个6哦',wxid=msgJson['wxid']))
+		ws.send(send_msg('WB很不喜欢单走一个6哦',wxid=msgJson['wxid']))
 
 ######################### ON MSG SWITCH #####################################
 def on_message(ws,message):
 	j=json.loads(message)
 	resp_type=j['type']
 	# output(j)
+	# output(resp_type)
 
 	# switch结构
 	action={
@@ -769,7 +778,7 @@ def patstat(datalist,callerid,roomid = None):
 def today_is_friday_in_california(datalist,callerid,roomid = None):
 	if datetime.today().weekday() == 4:
 		ws.send(send_attatch('C:\\users\\public\\Friday\\Today is Friday in California.mp4',roomid))
-		return ['Today is Friday in California.\n SHOOT!']
+		return ['Today is Friday in California.']
 	return ['Today is not Friday in California.']
 
 def arc_lookup(datalist,callerid,roomid = None):
@@ -788,7 +797,7 @@ def arc_lookup(datalist,callerid,roomid = None):
 			playerid = obj['data'][0]['code']
 			# output(obj)
 
-	message = f'{nickname}的好友码是{playerid}，PTT是%.2f。' % rating
+	message = f'{nickname}的好友码是{playerid},上一次在esterion网站查分时PTT是%.2f。' % rating
 	return [message,playerid]
 	# ws.send(send_msg(f'{nickname}的好友码是{playerid}，PTT是%.2f。' % rating,dest))
 
@@ -967,9 +976,9 @@ def whatis(datalist,callerid,roomid = None):
 		side = sides[level[9]]
 
 		if jp_name:
-			reply_txt += f"{artist} - {en_name}({jp_name}), BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包\n"
+			reply_txt += f"{artist} - {en_name}({jp_name}), BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, SongID为: {sid}\n"
 		else:
-			reply_txt += f"{artist} - {en_name}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包\n"
+			reply_txt += f"{artist} - {en_name}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, SongID为: {sid}\n"
 
 		other_aliases = sql_fetch(arcur,'alias',['alias'],f"sid = '{sid}'")
 		alias_list = [a[0] for a in other_aliases if a[0] != datalist[0]]
@@ -981,7 +990,26 @@ def whatis(datalist,callerid,roomid = None):
 	return [reply_txt,sid]
 	# ws.send(send_msg(reply_txt,dest))
 
-def whocharted(datalist,callerid,roomid = None):
+def addalias(datalist,callerid,roomid = None):
+	song_name = ''
+	for word in datalist[0:-1]:
+		song_name += (word + ' ')
+	song_name = song_name[:-1]
+	alias = datalist[-1]
+
+	sid = sql_fetch(arcur,'charts',['song_id'],f"name_en = '{song_name}'")
+	if len(sid) == 0:
+		sid = song_name
+		if len(sql_fetch(arcur,'charts',condition = f"song_id = '{sid}'")) == 0:
+			return [f'没有找到"{song_name}"相关歌曲 私密马赛']
+		else:
+			sid = [[sid]]
+
+	sid = sid[0][0]
+	sql_insert(arcdb,arcur,'alias',['sid','alias'],[sid,alias])
+	return [f'已添加别名{alias}至歌曲{sid}']
+
+def chartdetail(datalist,callerid,roomid = None):
 	song_name = datalist[0]
 	diff_lvl = {
 		'PST': 0,
@@ -989,11 +1017,11 @@ def whocharted(datalist,callerid,roomid = None):
 		'FTR': 2,
 		'BYD': 3
 	}
+	if datalist[1].upper() not in diff_lvl.keys():
+		return ['没有该难度。']
 	difficulty = diff_lvl.get(datalist[1].upper())
-	# output('got ok')
 	chart_detail = sql_fetch(arcur,'charts',condition = f"name_en = '{song_name}' AND rating_class = {difficulty}")
 	if len(chart_detail) == 0:
-		# output('opt solution')
 		sid = whatis([f"{song_name}"],callerid)[1]
 		if sid == -1:
 			return ['没有找到相关歌曲 私密马赛']
@@ -1002,9 +1030,11 @@ def whocharted(datalist,callerid,roomid = None):
 		if len(chart_detail) == 0:
 			return ['没有找到这张谱。']
 
+	const = int(chart_detail[0][16])/10
 	note_cnt = chart_detail[0][17]
 	charter = chart_detail[0][18]
-	reply_txt = f"有人谱师名义{charter}在这张谱上写下了{note_cnt}个Note"
+
+	reply_txt = f"Const: {const} | Notes: {note_cnt} | Charter: {charter}"
 	return [reply_txt]
 
 def search(datalist,callerid,roomid = None):
@@ -1122,6 +1152,31 @@ def search(datalist,callerid,roomid = None):
 		reply_txt += "\n"
 	return[reply_txt]
 
+def grablevel(datalist,callerid,roomid = None):
+	if len(datalist) < 1:
+		return ['请指明难度。']	
+
+	diff = float(datalist[0]) * 10
+	charts = sql_fetch(arcur,'charts',condition = f"rating = {diff}")
+	reply_txt = "该难度有以下歌曲:\n"
+	diff_list = ['PST', 'PRS', 'FTR', 'BYD']
+
+	for chart in charts:
+		en_name = chart[2]
+		jp_name = chart[3]
+		artist = chart[4]
+		chart_diff = diff_list[chart[1]]
+
+		if jp_name:
+			reply_txt += f"{artist} - {en_name}({jp_name}) ({chart_diff})\n"
+		else:
+			reply_txt += f"{artist} - {en_name} ({chart_diff})\n"
+	return [reply_txt]
+
+def constable(datalist,callerid,roomid = None):
+	ws.send(send_attatch('C:\\users\\public\\ArcaeaConstantTable.jpg',roomid))
+	return ['您要的阿卡伊定数表']
+
 def arc_room_id():
 	alphabet = string.ascii_lowercase + string.digits
 	return 'LR'+''.join(random.choices(alphabet, k=8))
@@ -1223,9 +1278,6 @@ def arc_link_select(datalist,callerid,roomid):
 	if song_started == 1:
 		return ['已有进行中的歌曲。']
 
-	if len(datalist) < 2:
-		return['请指明歌曲难度。']
-
 	diff_lvl = {
 		'PST': 0,
 		'PRS': 1,
@@ -1233,7 +1285,14 @@ def arc_link_select(datalist,callerid,roomid):
 		'BYD': 3
 	}
 
-	keyword = datalist[0]
+	if datalist[-1].upper() not in diff_lvl.keys():
+		return['请指明有效的歌曲难度。']
+
+	keyword = ''
+	for word in datalist[0:-1]:
+		keyword += (word + ' ')
+	keyword = keyword[:-1]
+	# output(keyword)
 	selected_song = sql_fetch(arcur,'charts',condition = f"name_en = '{keyword}'")
 
 	if len(selected_song) == 0:
@@ -1247,7 +1306,7 @@ def arc_link_select(datalist,callerid,roomid):
 		ws.send(send_msg('啊哈 是重名歌曲 默认选Quon(Lanota)哦\n选Quon(wacca)的话直接说quon2 我懒（',roomid))
 
 	try:
-		given_diff = datalist[1].upper()
+		given_diff = datalist[-1].upper()
 		chart_diff = diff_lvl.get(given_diff)
 		# output(chart_diff)
 		chart_detail = sql_fetch(arcur,'charts',condition = f"song_id = '{sid}' AND rating_class = {chart_diff}")
