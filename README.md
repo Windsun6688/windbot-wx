@@ -10,5 +10,6 @@ A Wechat chatbot which provides mainly Arcaea related features.
 
 使用来自这里的歌曲数据库 Using song database from [ArcaeaSongDataBase](https://github.com/Arcaea-Infinity/ArcaeaSongDatabase).
 
-使用redive.estertion.win的Arcaea查分代码参考 Reference of using interface of redive.estertion.win [Diving-Fish/ArcaeaBot](https://github.com/Diving-Fish/ArcaeaBot)
+使用redive.estertion.win的Arcaea查分代码参考 Reference of using redive.estertion.win's interface [Diving-Fish/ArcaeaBot](https://github.com/Diving-Fish/ArcaeaBot)
 
+5000兆生成器参考 Reference of 5000choyen style image generation [pcrbot/5000choyen]https://github.com/pcrbot/5000choyen
