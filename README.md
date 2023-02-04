@@ -12,4 +12,4 @@ A Wechat chatbot which provides mainly Arcaea related features.
 
 使用redive.estertion.win的Arcaea查分代码参考 Reference of using redive.estertion.win's interface [Diving-Fish/ArcaeaBot](https://github.com/Diving-Fish/ArcaeaBot)
 
-5000兆生成器参考 Reference of 5000choyen style image generation [pcrbot/5000choyen]https://github.com/pcrbot/5000choyen
+5000兆生成器参考 Reference of 5000choyen style image generation [pcrbot/5000choyen](https://github.com/pcrbot/5000choyen)
