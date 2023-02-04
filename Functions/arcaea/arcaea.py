@@ -315,11 +315,6 @@ def grablevel(datalist,callerid,roomid = None):
             reply_txt += f"{artist} - {en_name} ({chart_diff})\n"
     return [reply_txt]
 
-def constable(datalist,callerid,roomid = None):
-    ws.send(send_attatch('C:\\users\\public\\ArcaeaConstantTable.jpg',roomid))
-    return ['您要的阿卡伊定数表']
-
-
 def arc_random(datalist,callerid,roomid):
     if len(datalist) < 1:
         songs = list(set(sql_fetch(arcur,'charts')))
