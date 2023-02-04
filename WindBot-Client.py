@@ -1133,6 +1133,10 @@ def arc_link_quit(datalist,callerid,roomid):
     sql_delete(conn,link_room_id,f"wxid = '{callerid}'")
     return ['您已退出房间。']
 
+def constable(datalist,callerid,roomid = None):
+    ws.send(send_attatch('C:\\users\\public\\ArcaeaConstantTable.jpg',roomid))
+    return ['您要的阿卡伊定数表']
+
 ########################## MANAGING FUNCTIONS ##############################
 def ban(datalist,callerid,roomid):
 	# output(datalist)
