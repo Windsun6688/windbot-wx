@@ -1,4 +1,7 @@
 # windbot-wx
+![](https://img.shields.io/github/last-commit/Windsun6688/windbot-wx?style=for-the-badge)
+![](https://img.shields.io/github/commit-activity/w/Windsun6688/windbot-wx?style=for-the-badge)\
+
 
 A Wechat chatbot which provides mainly Arcaea related features.
 提供阿卡伊相关服务的微信机器人。
