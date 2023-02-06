@@ -1,6 +1,6 @@
 # windbot-wx
 ![](https://img.shields.io/github/last-commit/Windsun6688/windbot-wx?style=for-the-badge)
-![](https://img.shields.io/github/commit-activity/w/Windsun6688/windbot-wx?style=for-the-badge)\
+![](https://img.shields.io/github/commit-activity/w/Windsun6688/windbot-wx?style=for-the-badge)
 
 
 A Wechat chatbot which provides mainly Arcaea related features.
