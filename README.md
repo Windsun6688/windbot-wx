@@ -3,8 +3,8 @@
 ![](https://img.shields.io/github/commit-activity/w/Windsun6688/windbot-wx?style=for-the-badge)
 
 
-A Wechat chatbot which provides mainly Arcaea related features.
-提供阿卡伊相关服务的微信机器人。
+A Wechat chatbot which provides mainly rhythm-game-related features.
+提供音乐游戏相关服务的微信机器人。
 > 还在开发中，写码能力不强，请见谅（
 
 # :gift_heart: 特别感谢 Thanks
@@ -16,3 +16,5 @@ A Wechat chatbot which provides mainly Arcaea related features.
 使用redive.estertion.win的Arcaea查分代码参考 Reference of using redive.estertion.win's interface [Diving-Fish/ArcaeaBot](https://github.com/Diving-Fish/ArcaeaBot)
 
 5000兆生成器参考 Reference of 5000choyen style image generation [pcrbot/5000choyen](https://github.com/pcrbot/5000choyen)
+
+pjsekai.moe API使用参考 Reference of pjsekai.moe API use [FLAG250/hoshino-plugin-pjsk](https://github.com/FLAG250/hoshino-plugin-pjsk)
