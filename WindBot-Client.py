@@ -432,6 +432,7 @@ def sql_initialize_users():
 			arcID NUMBER NOT NULL DEFAULT -1,
 			qqID NUMBER NOT NULL DEFAULT -1,
 			maiID TEXT NOT NULL DEFAULT -1,
+			pjskID TEXT NOT NULL DEFAULT -1,
 			powerLevel NUMBER NULL DEFAULT 0,
 			isInLink TEXT NOT NULL DEFAULT -1,
 			banned NUMBER NOT NULL DEFAULT 0);'''
