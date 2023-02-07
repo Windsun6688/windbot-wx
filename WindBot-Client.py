@@ -1,12 +1,12 @@
 # -*- coding:utf-8 -*-
 
 import websocket,time,json,requests,os,rel,sqlite3,brotli,objectpath
-import random,string
-from datetime import datetime
+import random,string,traceback
 from threading import Thread
 from bs4 import BeautifulSoup
 from Functions.gosenchoyen.generator import genImage
 from Functions.arcaea.arcaea import *
+from Functions.pjsk.pjsk import *
 
 websocket._logging._logger.level = -99
 
@@ -51,6 +51,7 @@ class ThreadWithReturnValue(Thread):
     def run(self):
         if self._target is not None:
             self._return = self._target(*self._args,**self._kwargs)
+            return self._return
 
     def join(self, *args):
         Thread.join(self, *args)
@@ -175,6 +176,11 @@ def sql_match(db,dbcur,table,cols = ['*'],conditionCol = None,keyword = None):
 		return ['-1']
 	elif not conditionCol:
 		return ['-1']
+
+	source = db
+	db = sqlite3.connect(":memory:")
+	db.backup(source)
+	dbcur = db.cursor()
 
 	dbcur.execute('DROP TABLE IF EXISTS fuzzysearch')
 
@@ -600,7 +606,9 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'grablevel': grablevel,
 		'constable': constable,
 		'addalias': addalias,
-		'gosen': gen_5000
+		'gosen': gen_5000,
+		'pjskpf': pjskpf,
+		'amikaiden': amIkaiden,
 	}
 	'''
 	Terminal Log
@@ -625,6 +633,11 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		tbest.start()
 		return
 
+	if call_data[0] == 'pjskevent':
+		tpjsk = Thread(target = ongoingEvent,args = (real_data,callerid,destination))
+		tpjsk.start()
+		return
+
 	if call_data[0].lower() not in functions.keys():
 		output('Called non-existent function','WARNING',background = 'WHITE')
 		ws.send(send_msg('没有该指令。',destination))
@@ -632,9 +645,11 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 
 	try:
 		ansList = functions.get(call_data[0].lower())(real_data,callerid,destination)
+		# ansList = ThreadWithReturnValue(target = calledFunction,args = (real_data,callerid,destination)).run()
 		ws.send(send_function(ansList[0],destination))
+
 	except Exception as e:
-		output(type(e))
+		output(traceback.print_exc())
 		output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
 		ws.send(send_msg('出错了＿|￣|○\n请尝试检查指令参数，调用help或把WDS@出来',destination))
 
@@ -710,7 +725,9 @@ def handle_recv_msg(msgJson):
 	elif keyword=='dong':
 		ws.send(send_msg('ding',wxid=msgJson['wxid']))
 	elif keyword == '6':
-		ws.send(send_msg('WB很不喜欢单走一个6哦',wxid=msgJson['wxid']))
+		if roomid:
+			ws.send(send_msg('WB很不喜欢单走一个6哦',wxid=msgJson['wxid']))
+			# ban([msgJson['id1']],OP_list[0],msgJson['wxid'])
 
 ######################### ON MSG SWITCH #####################################
 def on_message(ws,message):
@@ -749,6 +766,7 @@ def bindID(datalist,callerid,roomid = None):
 	bindapp = {
 		'arc': 'arcID',
 		'qq': 'qqID',
+		'pjsk': 'pjskID'
 	}
 	app, usrID = datalist[0],datalist[1]
 	appsqlID = bindapp.get(app)
@@ -780,7 +798,7 @@ def patstat(datalist,callerid,roomid = None):
 	# ws.send(send_msg(f"你总共拍了我{patTimes}次{react}",dest))
 
 def today_is_friday_in_california(datalist,callerid,roomid = None):
-	if datetime.today().weekday() == 4:
+	if time.strftime("%w") == 5:
 		ws.send(send_attatch('C:\\users\\public\\Friday\\Today is Friday in California.mp4',roomid))
 		return ['Today is Friday in California.']
 	return ['Today is not Friday in California.']
@@ -797,8 +815,9 @@ def gen_5000(datalist,callerid,roomid):
 
 	genImage(word_a = first_keyword,word_b = second_keyword).save("/Users/windsun/Library/Application Support/CrossOver/Bottles/WechatServer/drive_c/users/Public/Gosenchoyen/5000.jpeg")
 	ws.send(send_attatch("/Users/windsun/Library/Application Support/CrossOver/Bottles/WechatServer/drive_c/users/Public/Gosenchoyen/5000.jpeg",roomid))
-	return ['您的五千兆图:']
+	return ['']
 
+#-----Arcaea-----
 def arc_best(datalist,callerid,roomid = None):
     conn_thread = sqlite3.connect('./windbotDB.db')
     cur_thread = conn_thread.cursor()
@@ -809,7 +828,6 @@ def arc_best(datalist,callerid,roomid = None):
     wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
 
     userid = sql_fetch(cur_thread,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
-    output(f"Fetching best for {userid}")
 
     if userid == -1:
         ws.send(send_msg('您未绑定ArcaeaID。请使用Bind指令绑定。',roomid))
@@ -825,6 +843,7 @@ def arc_best(datalist,callerid,roomid = None):
 
     if len(datalist) > 1:
         userid = datalist[1]
+    output(f"Fetching best {num} for {userid}")
 
     wsarc.send(str(userid))
 
@@ -877,6 +896,11 @@ def arc_best(datalist,callerid,roomid = None):
 
     ws.send(send_attatch(f"C:\\users\\Public\\Best\\{userinfo['name']} Best.txt",roomid))
 
+def constable(datalist,callerid,roomid = None):
+    ws.send(send_attatch('C:\\users\\public\\ArcaeaConstantTable.jpg',roomid))
+    return ['']
+
+#-----Arcaea Link-----
 def arc_room_id():
     alphabet = string.ascii_lowercase + string.digits
     return 'LR'+''.join(random.choices(alphabet, k=8))
@@ -1133,9 +1157,52 @@ def arc_link_quit(datalist,callerid,roomid):
     sql_delete(conn,link_room_id,f"wxid = '{callerid}'")
     return ['您已退出房间。']
 
-def constable(datalist,callerid,roomid = None):
-    ws.send(send_attatch('C:\\users\\public\\ArcaeaConstantTable.jpg',roomid))
-    return ['您要的阿卡伊定数表']
+#-----PJSK-----
+def ongoingEvent(datalist,callerid,roomid):
+    conn = sqlite3.connect('./windbotDB.db')
+    cur = conn.cursor()
+    userid = sql_fetch(cur,'Users',['pjskID'],f"wxid = '{callerid}'")[0][0]
+    if userid == -1:
+        return ['您未绑定Project Sekai ID。请使用Bind指令绑定。']
+
+    _data = data_req(url_e_data)
+    event_id, event_name, event_end_time, e_type = load_event_info(_data)
+    url1 = f'https://api.pjsekai.moe/api/user/%7Buser_id%7D/event/{event_id}/ranking?targetUserId={userid}'
+
+    user_event_data = req.get(url1, headers=headers)
+    _event_data = json.loads(user_event_data.text)
+
+    reply_txt = f"当前活动:「{event_name}」\n活动类型: {e_type}\n关闭时间: UTC+8 {event_end_time}\n"
+    if _event_data['rankings'] == []:
+        reply_txt += "您还未参与此活动。"
+    else:
+        score = _event_data['rankings'][0]['score']
+        rank = _event_data['rankings'][0]['rank']
+        reply_txt += f"您的分数为{score}pt, 处于榜上第{rank}位。"
+        nearest_line = -1
+        event_line = [100, 200, 500,
+                    1000, 2000, 5000,
+                    10000, 20000, 50000,
+                    100000, 200000, 500000,
+                    1000000, 2000000, 5000000]
+        for a in event_line:
+            if a < rank:
+                nearest_line = a
+            elif event_line[-1] < rank:
+                nearest_line = event_line[-1]
+
+        try:
+            url2 = f'https://api.pjsekai.moe/api/user/%7Buser_id%7D/event/{event_id}/ranking?targetRank={nearest_line}'
+
+            event_line_data = req.get(url2, headers=headers)
+            _event_line_data = json.loads(event_line_data.text)
+            # output(event_line_data)
+
+            reply_txt += f"\n最近分数线: rank#{nearest_line} {str(_event_line_data['rankings'][0]['score'])}pt"
+        except:
+            reply_txt += f"\n最近分数线: rank#{nearest_line} 暂无数据"
+
+    ws.send(send_msg(reply_txt,roomid))
 
 ########################## MANAGING FUNCTIONS ##############################
 def ban(datalist,callerid,roomid):
@@ -1271,6 +1338,7 @@ if __name__ == "__main__":
 	''' Initialize SQL'''
 	conn = sqlite3.connect('./windbotDB.db')
 	cur = conn.cursor()
+	# conn.execute('''ALTER TABLE Users ADD COLUMN pjskID TEXT NOT NULL DEFAULT -1''')
 	sql_initialize_users()
 	sql_initialize_groupnames()	
 
