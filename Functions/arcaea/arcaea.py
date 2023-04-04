@@ -429,12 +429,12 @@ def arc_random(datalist,callerid,roomid):
         "当然可以！推荐SONGNAME，这是一首非常欢快的歌曲，听起来充满活力和节奏感。曲中节奏变化多样，音符跃动特别灵动，让人难以坐底。无论是听得还是演奏都非常有趣，绝对是一首让人心情愉悦的曲子！"]
 
     if jp_name:
-        reply_txt = reply_format[random.randint(0,len(reply_format))].replace("\"歌曲名称\"",f"{en_name}({jp_name})")
-        if "\"艺术家\"" in reply_txt:
-            reply_txt = reply_txt.replace("\"艺术家\"",f'{artist}')
+        reply_txt = reply_format[random.randint(0,len(reply_format))].replace("SONGNAME",f"{en_name}({jp_name})")
+        if "ARTIST" in reply_txt:
+            reply_txt = reply_txt.replace("ARTIST",f'{artist}')
     else:
-        reply_txt = reply_format[random.randint(0,len(reply_format))].replace("\"歌曲名称\"",f"{en_name}")
-        if "\"艺术家\"" in reply_txt:
-            reply_txt = reply_txt.replace("\"艺术家\"",f'{artist}')
+        reply_txt = reply_format[random.randint(0,len(reply_format))].replace("SONGNAME",f"{en_name}")
+        if "ARTIST" in reply_txt:
+            reply_txt = reply_txt.replace("ARTIST",f'{artist}')
 
     return [reply_txt]
