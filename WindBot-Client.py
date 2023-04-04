@@ -4,12 +4,14 @@ import websocket,time,json,requests,os,rel,sqlite3,brotli,objectpath
 import random,string,traceback
 from threading import Thread
 from bs4 import BeautifulSoup
+from colorama import init
 from Functions.gosenchoyen.generator import genImage
 from Functions.arcaea.arcaea import *
 from Functions.pjsk.pjsk import *
 from Functions.maiCN.maimaiDX import *
 
 websocket._logging._logger.level = -99
+init(autoreset = True)
 
 ip='127.0.0.1'
 port=5555
@@ -35,11 +37,69 @@ STATUS_MSG=10000
 ATTATCH_FILE = 5003
 # 'type':49 带引用的消息
 
+ANIME_QUERY = """
+query ($id: Int, $idMal:Int, $search: String) {
+    Media (id: $id, idMal: $idMal, search: $search, type: ANIME) {
+        id
+        idMal
+        title {
+            romaji
+            english
+            native
+        }
+        format
+        status
+        episodes
+        duration
+        countryOfOrigin
+        source (version: 2)
+        trailer {
+            id
+            site
+        }
+        genres
+        tags {
+            name
+        }
+        averageScore
+        relations {
+            edges {
+                node {
+                    title {
+                        romaji
+                        english
+                    }
+                    id
+                    type
+                }
+                relationType
+            }
+        }
+        nextAiringEpisode {
+            timeUntilAiring
+            episode
+        }
+        isAdult
+        isFavourite
+        mediaListEntry {
+            status
+            score
+            id
+        }
+        siteUrl
+    }
+}
+"""
+
 '''Initialize Autohibernate'''
 undisturbed_hb = 0
 
 '''Admins'''
 OP_list = ['wxid_xd4gc9mu3stx12']
+
+'''Local Resource Path'''
+project_path = 'YOUR\\PROJECT\\PATH'
+resource_path = 'YOUR\\PROJECT\\PATH\\Resources'
 
 ############################# MULTITHREADING ################################
 class ThreadWithReturnValue(Thread):   
@@ -487,6 +547,19 @@ def send_attatch(filepath,wxid = 'null'):
 	output(f'File @ {filepath} -> {wxid}','SEND')
 	return json.dumps(qs)
 
+def send_pic(filepath,wxid = 'null'):
+	qs={
+		'id':getid(),
+		'type':PIC_MSG,
+		'wxid':wxid,
+		'roomid':'null',
+		'content':filepath,
+		'nickname':'null',
+		'ext':'null'
+	}
+	output(f"Media @ {filepath} -> {wxid}",'SEND')
+	return json.dumps(qs)
+
 ############################## HANDLES #####################################
 def handle_status_msg(msgJson):
 	# output(f'收到消息:{msgJson}')
@@ -602,7 +675,7 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'linkstart': arc_link_start,
 		'quitlink': arc_link_quit,
 		'random': arc_random,
-		'chartdetail': chartdetail,
+		'chartinfo': chartdetail,
 		'grablevel': grablevel,
 		'constable': constable,
 		'addalias': addalias,
@@ -639,8 +712,13 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		tpjsk.start()
 		return
 
+	if call_data[0].lower() == 'whatanime':
+		tani = Thread(target = anime_by_url,args = (real_data,callerid,destination))
+		tani.start()
+		return
+
 	if call_data[0].lower() == 'help':
-		ws.send(send_attatch('C:\\users\\public\\Help\\WindbotHelpGC.jpeg',destination))
+		ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',destination))
 		return
 
 	if call_data[0].lower() not in functions.keys():
@@ -718,12 +796,12 @@ def handle_recv_msg(msgJson):
 	'''
 	if keyword == 'help':
 		if roomid:
-			ws.send(send_attatch('C:\\users\\public\\Help\\WindbotHelpGC.jpeg',msgJson['wxid']))
+			ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',msgJson['wxid']))
 		else:
 			help_txt = open('WindBotHelpDM.txt','r').read()
 			ws.send(send_msg(f'{help_txt}',wxid = msgJson['wxid']))
 	elif keyword == 'linkhelp':
-		ws.send(send_attatch('C:\\users\\public\\Help\\WindbotLinkHelp.jpg',msgJson['wxid']))
+		ws.send(send_attatch(f'{resource_path}\\Help\\WindbotLinkHelp.jpg',msgJson['wxid']))
 	elif keyword=='ding':
 		ws.send(send_msg('dong',wxid=msgJson['wxid']))
 	elif keyword=='dong':
@@ -737,8 +815,8 @@ def handle_recv_msg(msgJson):
 def on_message(ws,message):
 	j=json.loads(message)
 	resp_type=j['type']
-	# output(j)
-	# output(resp_type)
+	#output(j)
+	#output(resp_type)
 
 	# switch结构
 	action={
@@ -799,8 +877,8 @@ def patstat(datalist,callerid,roomid = None):
 	# ws.send(send_msg(f"你总共拍了我{patTimes}次{react}",dest))
 
 def today_is_friday_in_california(datalist,callerid,roomid = None):
-	if time.strftime("%w") == 5:
-		ws.send(send_attatch('C:\\users\\public\\Friday\\Today is Friday in California.mp4',roomid))
+	if int(time.strftime("%w")) == 5:
+		ws.send(send_attatch(f'{resource_path}\\Friday\\Today is Friday in California.mp4',roomid))
 		return ['Today is Friday in California.']
 	return ['Today is not Friday in California.']
 
@@ -814,8 +892,8 @@ def gen_5000(datalist,callerid,roomid):
 		first_keyword = datalist[0]
 		second_keyword = datalist[1]
 
-	genImage(word_a = first_keyword,word_b = second_keyword).save("/Users/windsun/Library/Application Support/CrossOver/Bottles/WechatSrvr/drive_c/users/Public/Gosenchoyen/5000.jpeg")
-	ws.send(send_attatch("/Users/windsun/Library/Application Support/CrossOver/Bottles/WechatSrvr/drive_c/users/Public/Gosenchoyen/5000.jpeg",roomid))
+	genImage(word_a = first_keyword,word_b = second_keyword).save(f"{resource_path}\\Gosenchoyen\\5000.jpeg")
+	ws.send(send_attatch(f"{resource_path}\\Gosenchoyen\\5000.jpeg",roomid))
 	return ['']
 
 #-----Arcaea-----
@@ -876,7 +954,7 @@ def arc_best(datalist,callerid,roomid = None):
 			elif obj['cmd'] == 'userinfo':
 				userinfo = obj['data']
 				#Put In WINDOWS LOCATION
-				output_file = open("/Users/windsun/Library/Application Support/CrossOver/Bottles/WechatSrvr/drive_c/users/Public/Best/%s Best.txt" % userinfo['name'],'w')
+				output_file = open(f"{resource_path}\\Best\\%s Best.txt" % userinfo['name'],'w')
 				# output_file = open("./Best/%s Best.txt" % userinfo['name'],'w')
 
 	scores.sort(key=cmp, reverse=True)
@@ -894,10 +972,10 @@ def arc_best(datalist,callerid,roomid = None):
 				break
 			output_file.write("#%d  %s  %s %.1f  \n\t%s\n\tPure: %d(%d)\n\tFar: %d\n\tLost: %d\n\tScore: %d\n\tRating: %.2f\n" % (i+1, song_title[score['song_id']]['en'], diff_list[score['difficulty']], score['constant'], clear_list[score['clear_type']],score["perfect_count"], score["shiny_perfect_count"], score["near_count"], score["miss_count"], score["score"], score["rating"]))
 
-	ws.send(send_attatch(f"C:\\users\\Public\\Best\\{userinfo['name']} Best.txt",roomid))
+	ws.send(send_attatch(f"{resource_path}\\Best\\{userinfo['name']} Best.txt",roomid))
 
 def constable(datalist,callerid,roomid = None):
-	ws.send(send_attatch('C:\\users\\public\\ArcaeaConstantTable.jpg',roomid))
+	ws.send(send_attatch(f'{resource_path}\\ArcaeaConstantTable.jpg',roomid))
 	return ['']
 
 #-----Arcaea Link-----
@@ -1178,6 +1256,54 @@ def ongoingEvent(datalist,callerid,roomid):
 
 	ws.send(send_msg(reply_txt,roomid))
 
+#-----ANIME-----
+def anime_by_url(datalist,callerid,roomid):
+        if len(datalist) == 0:
+                ws.send(send_msg("请提供URL。",roomid))
+                return
+        url = datalist[0]
+        API_URL ='https://api.trace.moe/search?cutBorders&url=' + url
+        s = requests.Session()
+        res = s.get(API_URL).json()
+        results = res['result']
+        if results[0] == None:
+                return ['未能找到结果。']
+        
+        a = results[0]
+        anime_id = a['anilist']
+        anime_info = anilist_fetchfromid(ANIME_QUERY,{"id":int(anime_id)})['data']['Media']
+        origin = anime_info['countryOfOrigin']
+        native_name = anime_info['title']['native']
+        romaji_name = anime_info['title']['romaji']
+
+        episode = a['episode']
+        start_stamp = a['from']
+        start_min = int(start_stamp//60)
+        start_sec = int(start_stamp-start_min*60)
+        end_stamp = a['to']
+        end_min = int(end_stamp//60)
+        end_sec = int(end_stamp-end_min*60)
+
+        similarity = str(a['similarity']*100)[:5]+"%"
+        reply_txt = f"结果(可能性:{similarity}):\n"
+
+        reply_txt += f"[{origin}]{native_name}\n{romaji_name}\n第{episode}话 {start_min}分{start_sec}秒 - {end_min}分{end_sec}秒"
+
+        vid_url = a['video']
+        downloader = requests.get(vid_url,stream = True)
+        with open(f"{resource_path}\\WhatAnime\\result.mp4", 'wb') as f:
+                for chunk in downloader.iter_content(chunk_size = 1024*1024):
+                    if chunk:
+                      f.write(chunk)
+        ws.send(send_msg(reply_txt,roomid))
+        ws.send(send_pic(f"{resource_path}\\WhatAnime\\result.mp4",roomid))
+        #output("SENT VIDEO")
+
+def anilist_fetchfromid(query:str,vars_: dict):
+        url = "https://graphql.anilist.co"
+        headers = None
+        return requests.post(url,json={"query": query,"variables": vars_},headers=headers).json()
+
 ########################## MANAGING FUNCTIONS ##############################
 def ban(datalist,callerid,roomid):
 	# output(datalist)
@@ -1310,13 +1436,13 @@ def setsuper(datalist,callerid,roomid = None):
 ################################ MAIN #######################################
 if __name__ == "__main__":
 	''' Initialize SQL'''
-	conn = sqlite3.connect('./windbotDB.db')
+	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
 	cur = conn.cursor()
 	# conn.execute('''ALTER TABLE Users ADD COLUMN pjskID NUMBER NOT NULL DEFAULT -1''')
 	sql_initialize_users()
 	sql_initialize_groupnames()	
 
-	arcdb = sqlite3.connect('./arcsong.db')
+	arcdb = sqlite3.connect(f'{project_path}\\arcsong.db')
 	arcur = arcdb.cursor()
 
 	'''Initialize Websocket'''
@@ -1327,6 +1453,7 @@ if __name__ == "__main__":
 							on_error=on_error,
 							on_close=on_close)
 
-	ws.run_forever(dispatcher=rel, reconnect=5)  # Set dispatcher to automatic reconnection, 5 second reconnect delay if connection closed unexpectedly
-	rel.signal(2, rel.abort)  # Keyboard Interrupt
-	rel.dispatch()
+	#ws.run_forever(dispatcher=rel, reconnect=5)  # Set dispatcher to automatic reconnection, 5 second reconnect delay if connection closed unexpectedly
+	#rel.signal(2, rel.abort)  # Keyboard Interrupt
+	#rel.dispatch()
+	ws.run_forever(ping_interval=30)
