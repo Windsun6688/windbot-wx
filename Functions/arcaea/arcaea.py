@@ -118,10 +118,11 @@ def whatis(datalist,callerid,roomid = None):
         sides = ['光','对立','无色']
         side = sides[level[9]]
 
+        jp_txt = None
         if jp_name:
-            reply_txt += f"{artist} - {en_name}({jp_name}), BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, SongID为: {sid}\n"
-        else:
-            reply_txt += f"{artist} - {en_name}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, SongID为: {sid}\n"
+            jp_txt = f"({jp_name})"
+
+        reply_txt += f"{artist} - {en_name}{jp_txt}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, SongID为: {sid}\n"
 
         other_aliases = sql_fetch(arcur,'alias',['alias'],f"sid = '{sid}'")
         alias_list = [a[0] for a in other_aliases if a[0] != datalist[0]]
@@ -241,17 +242,20 @@ def search(datalist,callerid,roomid = None):
         unlock = ['不需要','需要']
         world_unlock = unlock[level[10]]
         jacket_designer = level[19]
-
         bg = level[12]
+
+        bg_txt = None
+        jacket_txt = None
+        jp_txt = None
+        if jacket_designer:
+            jacket_txt = f", 封面绘师{jacket_designer}"
         if bg:
             bg_txt = f", 有特殊背景{bg}"
-        else:
-            bg_txt = None
 
         if jp_name:
-            reply_txt += f"{artist} - {en_name}({jp_name}), BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, {world_unlock}爬梯获得, 封面绘师{jacket_designer}{bg_txt}\n"
-        else:
-            reply_txt += f"{artist} - {en_name}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, {world_unlock}爬梯获得, 封面绘师{jacket_designer}{bg_txt}\n"
+            jp_txt = f"({jp_name})"
+
+        reply_txt += f"{artist} - {en_name}{jp_txt}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, {world_unlock}爬梯获得, {jacket_txt}{bg_txt}\n"
 
         difficulty_cnt = len(song_detail)
 
@@ -310,10 +314,11 @@ def grablevel(datalist,callerid,roomid = None):
         artist = chart[4]
         chart_diff = diff_list[chart[1]]
 
+        jp_txt = None
         if jp_name:
-            reply_txt += f"{artist} - {en_name}({jp_name}) ({chart_diff})\n"
-        else:
-            reply_txt += f"{artist} - {en_name} ({chart_diff})\n"
+            jp_txt = f"({jp_name})"
+
+        reply_txt += f"{artist} - {en_name}{jp_txt} ({chart_diff})\n"
     return [reply_txt]
 
 def arc_random(datalist,callerid,roomid):
@@ -428,13 +433,12 @@ def arc_random(datalist,callerid,roomid):
         "当然可以！我再给您推荐一首SONGNAME。这首的节奏非常紧凑跳跃，充满着冒险的感觉。在色彩缤纷的背景音下，尤其是钢琴的部分，很容易让人深深印象，让您在游戏过程中彻底沉浸。跟着它的节奏一起跳跃，一起瞬间爆发，带领我们进入充满兴奋和活力的音乐旅程！",\
         "当然可以！推荐SONGNAME，这是一首非常欢快的歌曲，听起来充满活力和节奏感。曲中节奏变化多样，音符跃动特别灵动，让人难以坐底。无论是听得还是演奏都非常有趣，绝对是一首让人心情愉悦的曲子！"]
 
+    jp_txt = None
     if jp_name:
-        reply_txt = reply_format[random.randint(0,len(reply_format))].replace("SONGNAME",f"{en_name}({jp_name})")
-        if "ARTIST" in reply_txt:
-            reply_txt = reply_txt.replace("ARTIST",f'{artist}')
-    else:
-        reply_txt = reply_format[random.randint(0,len(reply_format))].replace("SONGNAME",f"{en_name}")
-        if "ARTIST" in reply_txt:
-            reply_txt = reply_txt.replace("ARTIST",f'{artist}')
+        jp_txt = f"({jp_name})"
+
+    reply_txt = reply_format[random.randint(0,len(reply_format))].replace("SONGNAME",f"{en_name}{jp_name}")
+    if "ARTIST" in reply_txt:
+        reply_txt = reply_txt.replace("ARTIST",f'{artist}')
 
     return [reply_txt]
