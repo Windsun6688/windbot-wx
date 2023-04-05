@@ -98,11 +98,8 @@ undisturbed_hb = 0
 OP_list = ['wxid_xd4gc9mu3stx12']
 
 '''Local Resource Path'''
-project_path = 'C:\\Users\\W1ndsun\\Downloads\\Chatbot'
-resource_path = 'C:\\Users\\W1ndsun\\Downloads\\Chatbot\\Resources'
-
-# project_path = 'YOUR\\PROJECT\\PATH'
-# resource_path = 'YOUR\\PROJECT\\PATH\\Resources'
+project_path = 'YOUR\\PROJECT\\PATH'
+resource_path = 'YOUR\\PROJECT\\PATH\\Resources'
 
 ############################# MULTITHREADING ################################
 class ThreadWithReturnValue(Thread):   
