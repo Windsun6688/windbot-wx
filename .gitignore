@@ -135,6 +135,7 @@ DEPRECIATED/
 Dependacies/
 maiData/
 maiCover/
+reference/
 
 # Database Files
 *.db
