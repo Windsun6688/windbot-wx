@@ -128,6 +128,15 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Pics
-song/*.jpg
-char/*.png
+# Depreciated Contents
+DEPRECIATED/
+
+# Dependancies
+Dependacies/
+maiData/
+
+# Database Files
+*.db
+*.json
+
+
