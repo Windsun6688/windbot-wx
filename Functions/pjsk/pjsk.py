@@ -96,6 +96,6 @@ def amIkaiden(datalist,callerid,roomid = None):
 def load_event_info(_data):
     i = -2
     close_time = int(_data[i]["closedAt"]/1000) 
-    if time.time() > close_time: #说明倒数第二个活动已关闭，按最新的算
+    if time.time() > close_time:
         i = -1
     return _data[i]['id'], _data[i]['name'], time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(int(_data[i]["aggregateAt"]/1000))),  _data[i]['eventType']

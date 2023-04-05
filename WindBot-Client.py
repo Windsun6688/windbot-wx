@@ -98,8 +98,11 @@ undisturbed_hb = 0
 OP_list = ['wxid_xd4gc9mu3stx12']
 
 '''Local Resource Path'''
-project_path = 'YOUR\\PROJECT\\PATH'
-resource_path = 'YOUR\\PROJECT\\PATH\\Resources'
+project_path = 'C:\\Users\\W1ndsun\\Downloads\\Chatbot'
+resource_path = 'C:\\Users\\W1ndsun\\Downloads\\Chatbot\\Resources'
+
+# project_path = 'YOUR\\PROJECT\\PATH'
+# resource_path = 'YOUR\\PROJECT\\PATH\\Resources'
 
 ############################# MULTITHREADING ################################
 class ThreadWithReturnValue(Thread):   
@@ -315,18 +318,6 @@ def get_member_nick(roomid = 'null',wxid = None):
 	respJson=send(uri,data)
 	return json.loads(respJson['content'])['nick']
 
-def get_personal_info():
-	# 获取本机器人的信息
-	uri='/api/get_personal_info'
-	data={
-		'id':getid(),
-		'type':PERSONAL_INFO,
-		'content':'op:personal info',
-		'wxid':'null',
-	}
-	respJson=send(uri,data)
-	print(respJson)
-
 ################################# websocket #################################
 def debug_switch():
 	qs={
@@ -400,6 +391,22 @@ def get_personal_detail(wxid):
 	return json.dumps(qs)
 
 def handle_personal_detail(j):
+	output(j)
+
+def get_personal_info():
+	qs={
+		'id':getid(),
+		'type':PERSONAL_INFO,
+		'content':'null',
+		'wxid': wxid,
+		'roomid':'null',
+		'content':'null',
+		'nickname':'null',
+		'ext':'null',
+	}
+	return json.dumps(qs)
+
+def handle_personal_info(j):
 	output(j)
 
 def send_wxuser_list():
@@ -656,7 +663,7 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 
 	functions = {
 		'bind': bindID,
-		'arclookup': arc_lookup,
+		'alookup': arc_lookup,
 		'whatis': whatis,
 		'patstat': patstat,
 		'arcrecent': arc_recent,
@@ -675,14 +682,14 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'linkstart': arc_link_start,
 		'quitlink': arc_link_quit,
 		'random': arc_random,
-		'chartinfo': chartdetail,
+		'ainfo': chartdetail,
 		'grablevel': grablevel,
 		'constable': constable,
 		'addalias': addalias,
 		'gosen': gen_5000,
 		'pjskpf': pjskpf,
 		'amikaiden': amIkaiden,
-		'maisearch': maisearch,
+		'minfo': maisearch,
 	}
 	'''
 	Terminal Log
@@ -706,6 +713,15 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		tbest = Thread(target=arc_best,args = (real_data,callerid,destination))
 		tbest.start()
 		return
+
+	# MAIMAI Best 40 runs on a seperate thread
+	if call_data[0].lower() == 'mb40':
+		real_data = []
+		ws.send(send_msg('正在获取',destination))
+		tmb40 = Thread(target=mai_best,args = (real_data,callerid,destination))
+		tmb40.start()
+		return
+
 	# Project Sekai Event fetch runs on a seperate thread
 	if call_data[0].lower() == 'pjskevent':
 		tpjsk = Thread(target = ongoingEvent,args = (real_data,callerid,destination))
@@ -798,8 +814,7 @@ def handle_recv_msg(msgJson):
 		if roomid:
 			ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',msgJson['wxid']))
 		else:
-			help_txt = open('WindBotHelpDM.txt','r').read()
-			ws.send(send_msg(f'{help_txt}',wxid = msgJson['wxid']))
+			ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpDM.jpeg',msgJson['wxid']))
 	elif keyword == 'linkhelp':
 		ws.send(send_attatch(f'{resource_path}\\Help\\WindbotLinkHelp.jpg',msgJson['wxid']))
 	elif keyword=='ding':
@@ -824,7 +839,8 @@ def on_message(ws,message):
 		PERSONAL_DETAIL:handle_personal_detail,
 		AT_MSG:handle_at_msg,
 		DEBUG_SWITCH:handle_recv_msg,
-		PERSONAL_INFO:handle_recv_msg,
+		PERSONAL_INFO:handle_personal_info,
+		PERSONAL_DETAIL:handle_personal_detail,
 		TXT_MSG:handle_sent_msg,
 		PIC_MSG:handle_sent_msg,
 		ATTATCH_FILE:handle_sent_msg,
@@ -845,7 +861,8 @@ def bindID(datalist,callerid,roomid = None):
 	bindapp = {
 		'arc': 'arcID',
 		'qq': 'qqID',
-		'pjsk': 'pjskID'
+		'pjsk': 'pjskID',
+		'mai': 'maiID'
 	}
 	app, usrID = datalist[0],datalist[1]
 	appsqlID = bindapp.get(app)
@@ -1303,6 +1320,37 @@ def anilist_fetchfromid(query:str,vars_: dict):
         url = "https://graphql.anilist.co"
         headers = None
         return requests.post(url,json={"query": query,"variables": vars_},headers=headers).json()
+
+#-----MAIMAI-----
+def mai_best(datalist,callerid,roomid = None):
+	conn_thread = sqlite3.connect('./windbotDB.db')
+	cur_thread = conn_thread.cursor()
+
+	gamertag = sql_fetch(cur_thread,'Users',['maiID'],f"wxid = '{callerid}'")
+	if gamertag[0][0] == '-1':
+		return ['您未绑定maimai查分器ID。请使用Bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。']
+	user_data = mai_api_get(gamertag)
+	if user_data == -2:
+		return ['该用户选择不公开数据。']
+	elif user_data == -1:
+		return [f'请检查您绑定的查分器用户ID。目前绑定: {gamertag}']
+	elif user_data == 0:
+		return ['发生未知错误。']
+	ra = user_data['rating']
+	add_ra = user_data['additional_rating']
+	nickname = user_data['nickname']
+	sd_best = list(user_data['charts']['sd'])
+	dx_best = list(user_data['charts']['dx'])
+	output_file = open(f"{resource_path}\\MaiBest\\%s MaiB40.txt" % nickname,'w',encoding = 'UTF-8')
+	output_file.write(f'{nickname} | Rating: {ra+add_ra}(Base {ra} + Rank {add_ra})')
+	output_file.write('\n[========当前版本B15========]\n')
+	for song in dx_best:
+		output_file.write(process_record(song))
+
+	output_file.write('\n[=========旧版本B25========]\n')
+	for song in sd_best:
+		output_file.write(process_record(song))
+	ws.send(send_attatch(f"{resource_path}\\MaiBest\\%s MaiB40.txt" % nickname,roomid))
 
 ########################## MANAGING FUNCTIONS ##############################
 def ban(datalist,callerid,roomid):

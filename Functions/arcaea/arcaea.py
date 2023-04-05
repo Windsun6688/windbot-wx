@@ -437,7 +437,7 @@ def arc_random(datalist,callerid,roomid):
     if jp_name:
         jp_txt = f"({jp_name})"
 
-    reply_txt = reply_format[random.randint(0,len(reply_format))].replace("SONGNAME",f"{en_name}{jp_name}")
+    reply_txt = reply_format[random.randint(0,len(reply_format))].replace("SONGNAME",f"{en_name}{jp_txt}")
     if "ARTIST" in reply_txt:
         reply_txt = reply_txt.replace("ARTIST",f'{artist}')
 
