@@ -118,7 +118,7 @@ def whatis(datalist,callerid,roomid = None):
         sides = ['光','对立','无色']
         side = sides[level[9]]
 
-        jp_txt = None
+        jp_txt = ''
         if jp_name:
             jp_txt = f"({jp_name})"
 
@@ -244,9 +244,9 @@ def search(datalist,callerid,roomid = None):
         jacket_designer = level[19]
         bg = level[12]
 
-        bg_txt = None
-        jacket_txt = None
-        jp_txt = None
+        bg_txt = ''
+        jacket_txt = ''
+        jp_txt = ''
         if jacket_designer:
             jacket_txt = f", 封面绘师{jacket_designer}"
         if bg:
@@ -314,7 +314,7 @@ def grablevel(datalist,callerid,roomid = None):
         artist = chart[4]
         chart_diff = diff_list[chart[1]]
 
-        jp_txt = None
+        jp_txt = ''
         if jp_name:
             jp_txt = f"({jp_name})"
 
@@ -433,7 +433,7 @@ def arc_random(datalist,callerid,roomid):
         "当然可以！我再给您推荐一首SONGNAME。这首的节奏非常紧凑跳跃，充满着冒险的感觉。在色彩缤纷的背景音下，尤其是钢琴的部分，很容易让人深深印象，让您在游戏过程中彻底沉浸。跟着它的节奏一起跳跃，一起瞬间爆发，带领我们进入充满兴奋和活力的音乐旅程！",\
         "当然可以！推荐SONGNAME，这是一首非常欢快的歌曲，听起来充满活力和节奏感。曲中节奏变化多样，音符跃动特别灵动，让人难以坐底。无论是听得还是演奏都非常有趣，绝对是一首让人心情愉悦的曲子！"]
 
-    jp_txt = None
+    jp_txt = ''
     if jp_name:
         jp_txt = f"({jp_name})"
 
