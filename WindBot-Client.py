@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-import websocket,time,json,requests,os,rel,sqlite3,brotli,objectpath
+import websocket,time,json,requests,os,rel,sqlite3,brotli
 import random,string,traceback
 from threading import Thread
 from bs4 import BeautifulSoup
@@ -14,6 +14,7 @@ websocket._logging._logger.level = -99
 init(autoreset = True)
 
 ip='127.0.0.1'
+
 port=5555
 
 SERVER=f'ws://{ip}:{port}'
@@ -39,55 +40,55 @@ ATTATCH_FILE = 5003
 
 ANIME_QUERY = """
 query ($id: Int, $idMal:Int, $search: String) {
-    Media (id: $id, idMal: $idMal, search: $search, type: ANIME) {
-        id
-        idMal
-        title {
-            romaji
-            english
-            native
-        }
-        format
-        status
-        episodes
-        duration
-        countryOfOrigin
-        source (version: 2)
-        trailer {
-            id
-            site
-        }
-        genres
-        tags {
-            name
-        }
-        averageScore
-        relations {
-            edges {
-                node {
-                    title {
-                        romaji
-                        english
-                    }
-                    id
-                    type
-                }
-                relationType
-            }
-        }
-        nextAiringEpisode {
-            timeUntilAiring
-            episode
-        }
-        isAdult
-        isFavourite
-        mediaListEntry {
-            status
-            score
-            id
-        }
-        siteUrl
-    }
+	Media (id: $id, idMal: $idMal, search: $search, type: ANIME) {
+		id
+		idMal
+		title {
+			romaji
+			english
+			native
+		}
+		format
+		status
+		episodes
+		duration
+		countryOfOrigin
+		source (version: 2)
+		trailer {
+			id
+			site
+		}
+		genres
+		tags {
+			name
+		}
+		averageScore
+		relations {
+			edges {
+				node {
+					title {
+						romaji
+						english
+					}
+					id
+					type
+				}
+				relationType
+			}
+		}
+		nextAiringEpisode {
+			timeUntilAiring
+			episode
+		}
+		isAdult
+		isFavourite
+		mediaListEntry {
+			status
+			score
+			id
+		}
+		siteUrl
+	}
 }
 """
 
@@ -98,11 +99,14 @@ undisturbed_hb = 0
 OP_list = ['wxid_xd4gc9mu3stx12']
 
 '''Local Resource Path'''
-project_path = 'YOUR\\PROJECT\\PATH'
-resource_path = 'YOUR\\PROJECT\\PATH\\Resources'
+project_path = os.path.join(os.path.dirname(__file__))
+resource_path = os.path.join(os.path.dirname(__file__),'Resources')
+
+'''Recent Logs List'''
+latest_logs = []
 
 ############################# MULTITHREADING ################################
-class ThreadWithReturnValue(Thread):   
+class ThreadWithReturnValue(Thread):
 	def __init__(self, group=None, target=None, name=None,
 				 args=(), kwargs={}, Verbose=None):
 		Thread.__init__(self, group, target, name, args, kwargs)
@@ -163,6 +167,12 @@ def output(msg,logtype = 'SYSTEM',mode = 'DEFAULT',background = 'DEFAULT'):
 		error_log_file = open('ErrorLog.txt','a')
 		error_log_file.write(f"[{now} {logtype}] {msg}\n")
 		error_log_file.close()
+
+	# Store Log into latest_logs list
+	if logtype != 'HEART_BEAT':
+		if len(latest_logs) == 20:
+			latest_logs.pop(0)
+		latest_logs.append(f"[{now} {logtype}] {msg}")
 
 	# print("["+f"{color}[1;35m{LogType}{color}[0m"+"]"+' Success')
 	# print(f'[{now}]:{msg}')
@@ -631,7 +641,7 @@ def handle_recv_pic(msgJson):
 	if msgJson['id2']:
 		roomid=msgJson['id1'] #群id
 		senderid=msgJson['id2'] #个人id
-		
+
 		nickname = sql_fetch(cur,f'r{roomid[:-9]}',['groupUsrName'],f"wxid = '{senderid}'")[0][0]
 		roomname = sql_fetch(cur,'Groupchats',['groupname'],f'roomid = {roomid[:-9]}')[0][0]
 		'''
@@ -654,6 +664,9 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		return
 
 	call_data = keyword.split(' ')
+	if len(call_data) == 0:
+		ws.send('请指明需要调用的功能。')
+		return
 	#handle mobile @
 	if len(call_data) > 1 and call_data[0] == '':
 		call_data = call_data[1:]
@@ -663,7 +676,6 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'alookup': arc_lookup,
 		'whatis': whatis,
 		'patstat': patstat,
-		'arcrecent': arc_recent,
 		'friday': today_is_friday_in_california,
 		'ban': ban,
 		'unban':unban,
@@ -687,6 +699,7 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'pjskpf': pjskpf,
 		'amikaiden': amIkaiden,
 		'minfo': maisearch,
+		'logs': fetch_logs,
 	}
 	'''
 	Terminal Log
@@ -696,11 +709,13 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	else:
 		output(f'{nickname}: {keyword}','CALL','HIGHLIGHT')
 
+
 	'''
 	Call individual function
 	'''
 	real_data = call_data[1:]
 	send_function = send_msg
+
 
 	# Best XX Function runs on a seperate thread
 	if call_data[0][0].lower() == 'b' and call_data[0][1:].isdigit():
@@ -725,9 +740,16 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		tpjsk.start()
 		return
 
+	# anime tracing runs on a seperate thread
 	if call_data[0].lower() == 'whatanime':
 		tani = Thread(target = anime_by_url,args = (real_data,callerid,destination))
 		tani.start()
+		return
+
+	# arcrecent runs on a seperate thread
+	if call_data[0].lower() == 'arcrecent':
+		tarcre = Thread(target = arc_recent,args = (real_data,callerid,destination))
+		tarcre.start()
 		return
 
 	if call_data[0].lower() == 'help':
@@ -748,14 +770,12 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
 		ws.send(send_msg('出错了＿|￣|○\n请尝试检查指令参数，调用help或把WDS@出来',destination))
 
-	# ws.send(send_msg('收到调用',dest))
-
 def handle_recv_msg(msgJson):
 	global undisturbed_hb
 	undisturbed_hb = 0
 	# output(msgJson)
 	# output('on recv msg OK')
-	
+
 	isCite = False
 	if msgJson['id2']:
 		isCite = True
@@ -763,7 +783,7 @@ def handle_recv_msg(msgJson):
 	if '@chatroom' in msgJson['wxid']:
 		roomid=msgJson['wxid'] #群id
 		senderid=msgJson['id1'] #个人id
-		
+
 		nickname = sql_fetch(cur,f'r{roomid[:-9]}',['groupUsrName'],f"wxid = '{senderid}'")[0][0]
 		roomname = sql_fetch(cur,'Groupchats',['groupname'],f'roomid = {roomid[:-9]}')[0][0]
 
@@ -968,12 +988,12 @@ def arc_best(datalist,callerid,roomid = None):
 			elif obj['cmd'] == 'userinfo':
 				userinfo = obj['data']
 				#Put In WINDOWS LOCATION
-				output_file = open(f"{resource_path}\\Best\\%s Best.txt" % userinfo['name'],'w')
+				output_file = open(f"{resource_path}\\Best\\%s Best.txt" % userinfo['name'],'w',encoding = 'UTF-8')
 				# output_file = open("./Best/%s Best.txt" % userinfo['name'],'w')
 
 	scores.sort(key=cmp, reverse=True)
 
-	output('数据已拿全,正在整理')    
+	output('数据已拿全,正在整理')
 
 	output_file.write("%s's Top %d Songs:\n" % (userinfo['name'], num))
 	for j in range(0, int((num - 1) / 15) + 1):
@@ -987,6 +1007,76 @@ def arc_best(datalist,callerid,roomid = None):
 			output_file.write("#%d  %s  %s %.1f  \n\t%s\n\tPure: %d(%d)\n\tFar: %d\n\tLost: %d\n\tScore: %d\n\tRating: %.2f\n" % (i+1, song_title[score['song_id']]['en'], diff_list[score['difficulty']], score['constant'], clear_list[score['clear_type']],score["perfect_count"], score["shiny_perfect_count"], score["near_count"], score["miss_count"], score["score"], score["rating"]))
 
 	ws.send(send_attatch(f"{resource_path}\\Best\\{userinfo['name']} Best.txt",roomid))
+
+def arc_recent(datalist,callerid,roomid = None):
+	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
+	cur = conn.cursor()
+	arcdb = sqlite3.connect(f'{project_path}\\arcsong.db')
+	arcur = arcdb.cursor()
+	clear_list = ['Track Lost', 'Normal Clear', 'Full Recall', 'Pure Memory', 'Easy Clear', 'Hard Clear']
+	diff_list = ['PST', 'PRS', 'FTR', 'BYD']
+
+	wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
+
+	userid = sql_fetch(cur,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
+	# output(userid)
+
+	if userid == -1:
+		ws.send(send_msg('您未绑定ArcaeaID。请使用Bind指令绑定。',roomid))
+		return
+
+	wsarc.send(f"{userid} -1 -1")
+	# output('sent')
+	buffer = ""
+	scores = []
+	userinfo = {}
+	song_title = {}
+	while buffer != "bye":
+		try:
+			buffer = wsarc.recv()
+		except websocket._exceptions.WebSocketConnectionClosedException:
+			wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
+			wsarc.send(f"{userid} -1 -1")
+		if type(buffer) == type(b''):
+			# print("recv")
+			obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
+			# output(obj)
+			# al.append(obj)
+			if obj['cmd'] == 'userinfo':
+				userinfo = obj['data']
+				name = userinfo['name']
+				recent_song = userinfo['recent_score'][0]
+
+				# output('---------')
+				# output(recent_song)
+
+				sid = recent_song['song_id']
+				diff = diff_list[recent_song['difficulty']]
+				constant = recent_song['constant']
+				score = recent_song['score']
+				perfect = recent_song['perfect_count']
+				shiny_p = recent_song['shiny_perfect_count']
+				far = recent_song['near_count']
+				miss = recent_song['miss_count']
+				played_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(int(recent_song['time_played']/1000)))
+
+				cleartype = clear_list[recent_song['clear_type']]
+				best_cleartype = clear_list[recent_song['best_clear_type']]
+				single_rating = recent_song['rating']
+				song_detail = sql_fetch(arcur,'charts',['name_en','name_jp','artist'],f"song_id = '{sid}'")
+
+				en_name = song_detail[0][0]
+				jp_name = song_detail[0][1]
+				artist = song_detail[0][2]
+
+				if jp_name:
+					answer_txt = f"Recent Play:\n{artist} - {en_name}({jp_name}) ({diff} {constant})\n{score} {cleartype} ({best_cleartype})\nPerfect: {perfect}({shiny_p})\nFar: {far}\nMiss: {miss}\nRating: %.3f\nTime: {played_time}" % single_rating
+				else:
+					answer_txt = f"Recent Play:\n{artist} - {en_name} ({diff} {constant})\n{score} {cleartype} ({best_cleartype})\nPerfect: {perfect}({shiny_p})\nFar: {far}\nMiss: {miss}\nRating: %.3f\nTime: {played_time}" % single_rating
+				ws.send(send_msg(answer_txt,roomid))
+				return [answer_txt,score,name]
+	ws.send(send_msg('出现了一些问题。',roomid))
+	return
 
 def constable(datalist,callerid,roomid = None):
 	ws.send(send_attatch(f'{resource_path}\\ArcaeaConstantTable.jpg',roomid))
@@ -1036,7 +1126,7 @@ def arc_signup(datalist,callerid,roomid = None,isOwner = None):
 		can_select = 1
 	else:
 		isOwner = 0
-		can_select = -1 
+		can_select = -1
 
 		is_all = sql_fetch(cur,link_room_id,['allselect'])
 		if is_all[0][0] == 1:
@@ -1079,7 +1169,7 @@ def arc_link_destroy(datalist,callerid,roomid = None):
 		wxid = wxid[0]
 		sql_update(conn,'Users','isInLink',-1,f"wxid = '{wxid}'")
 	output(f'Stopped Link Play Room of ID {link_room_id}','STOP_LINK',background = "WHITE")
-	return ['房间已结束。']   
+	return ['房间已结束。']
 
 def arc_link_select(datalist,callerid,roomid):
 	link_room_id = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
@@ -1272,51 +1362,51 @@ def ongoingEvent(datalist,callerid,roomid):
 
 #-----ANIME-----
 def anime_by_url(datalist,callerid,roomid):
-        if len(datalist) == 0:
-                ws.send(send_msg("请提供URL。",roomid))
-                return
-        url = datalist[0]
-        API_URL ='https://api.trace.moe/search?cutBorders&url=' + url
-        s = requests.Session()
-        res = s.get(API_URL).json()
-        results = res['result']
-        if results[0] == None:
-                return ['未能找到结果。']
-        
-        a = results[0]
-        anime_id = a['anilist']
-        anime_info = anilist_fetchfromid(ANIME_QUERY,{"id":int(anime_id)})['data']['Media']
-        origin = anime_info['countryOfOrigin']
-        native_name = anime_info['title']['native']
-        romaji_name = anime_info['title']['romaji']
+		if len(datalist) == 0:
+				ws.send(send_msg("请提供URL。",roomid))
+				return
+		url = datalist[0]
+		API_URL ='https://api.trace.moe/search?cutBorders&url=' + url
+		s = requests.Session()
+		res = s.get(API_URL).json()
+		results = res['result']
+		if results[0] == None:
+				return ['未能找到结果。']
 
-        episode = a['episode']
-        start_stamp = a['from']
-        start_min = int(start_stamp//60)
-        start_sec = int(start_stamp-start_min*60)
-        end_stamp = a['to']
-        end_min = int(end_stamp//60)
-        end_sec = int(end_stamp-end_min*60)
+		a = results[0]
+		anime_id = a['anilist']
+		anime_info = anilist_fetchfromid(ANIME_QUERY,{"id":int(anime_id)})['data']['Media']
+		origin = anime_info['countryOfOrigin']
+		native_name = anime_info['title']['native']
+		romaji_name = anime_info['title']['romaji']
 
-        similarity = str(a['similarity']*100)[:5]+"%"
-        reply_txt = f"结果(可能性:{similarity}):\n"
+		episode = a['episode']
+		start_stamp = a['from']
+		start_min = int(start_stamp//60)
+		start_sec = int(start_stamp-start_min*60)
+		end_stamp = a['to']
+		end_min = int(end_stamp//60)
+		end_sec = int(end_stamp-end_min*60)
 
-        reply_txt += f"[{origin}]{native_name}\n{romaji_name}\n第{episode}话 {start_min}分{start_sec}秒 - {end_min}分{end_sec}秒"
+		similarity = str(a['similarity']*100)[:5]+"%"
+		reply_txt = f"结果(可能性:{similarity}):\n"
 
-        vid_url = a['video']
-        downloader = requests.get(vid_url,stream = True)
-        with open(f"{resource_path}\\WhatAnime\\result.mp4", 'wb') as f:
-                for chunk in downloader.iter_content(chunk_size = 1024*1024):
-                    if chunk:
-                      f.write(chunk)
-        ws.send(send_msg(reply_txt,roomid))
-        ws.send(send_pic(f"{resource_path}\\WhatAnime\\result.mp4",roomid))
-        #output("SENT VIDEO")
+		reply_txt += f"[{origin}]{native_name}\n{romaji_name}\n第{episode}话 {start_min}分{start_sec}秒 - {end_min}分{end_sec}秒"
+
+		vid_url = a['video']
+		downloader = requests.get(vid_url,stream = True)
+		with open(f"{resource_path}\\WhatAnime\\result.mp4", 'wb') as f:
+				for chunk in downloader.iter_content(chunk_size = 1024*1024):
+					if chunk:
+					  f.write(chunk)
+		ws.send(send_msg(reply_txt,roomid))
+		ws.send(send_pic(f"{resource_path}\\WhatAnime\\result.mp4",roomid))
+		#output("SENT VIDEO")
 
 def anilist_fetchfromid(query:str,vars_: dict):
-        url = "https://graphql.anilist.co"
-        headers = None
-        return requests.post(url,json={"query": query,"variables": vars_},headers=headers).json()
+		url = "https://graphql.anilist.co"
+		headers = None
+		return requests.post(url,json={"query": query,"variables": vars_},headers=headers).json()
 
 #-----MAIMAI-----
 def mai_best(datalist,callerid,roomid = None):
@@ -1325,14 +1415,18 @@ def mai_best(datalist,callerid,roomid = None):
 
 	gamertag = sql_fetch(cur_thread,'Users',['maiID'],f"wxid = '{callerid}'")
 	if gamertag[0][0] == '-1':
-		return ['您未绑定maimai查分器ID。请使用Bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。']
+		ws.send(send_msg('您未绑定maimai查分器ID。请使用Bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。',roomid))
+		return
 	user_data = mai_api_get(gamertag)
 	if user_data == -2:
-		return ['该用户选择不公开数据。']
+		ws.send(send_msg('该用户选择不公开数据。',roomid))
+		return
 	elif user_data == -1:
-		return [f'请检查您绑定的查分器用户ID。目前绑定: {gamertag}']
+		ws.send(send_msg(f'请检查您绑定的查分器用户ID。目前绑定: {gamertag[0][0]}',roomid))
+		return
 	elif user_data == 0:
-		return ['发生未知错误。']
+		ws.send(send_msg('发生未知错误。',roomid))
+		return
 	ra = user_data['rating']
 	add_ra = user_data['additional_rating']
 	nickname = user_data['nickname']
@@ -1478,6 +1572,20 @@ def setsuper(datalist,callerid,roomid = None):
 	punch([callerid],'wxid_xd4gc9mu3stx12',roomid)
 	return['']
 
+def fetch_logs(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+
+	if caller_level[0][0] < 3:
+		return ['您的权限不足。']
+
+	log_wanted_cnt = 15
+	if len(datalist) != 0:
+		log_wanted_cnt = int(datalist[0])
+
+	reply_txt = ''.join(l+'\n' for l in latest_logs[-(log_wanted_cnt):])
+
+	return [reply_txt]
+
 ################################ MAIN #######################################
 if __name__ == "__main__":
 	''' Initialize SQL'''
@@ -1498,7 +1606,8 @@ if __name__ == "__main__":
 							on_error=on_error,
 							on_close=on_close)
 
-	#ws.run_forever(dispatcher=rel, reconnect=5)  # Set dispatcher to automatic reconnection, 5 second reconnect delay if connection closed unexpectedly
-	#rel.signal(2, rel.abort)  # Keyboard Interrupt
-	#rel.dispatch()
-	ws.run_forever(ping_interval=30)
+	# Set dispatcher to automatic reconnection, 5 second reconnect delay if connection closed unexpectedly
+	ws.run_forever(dispatcher=rel, reconnect=5)
+	rel.signal(2, rel.abort)  # Keyboard Interrupt
+	rel.dispatch()
+	# ws.run_forever(ping_interval=30)
