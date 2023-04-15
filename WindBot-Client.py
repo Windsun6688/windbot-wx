@@ -698,7 +698,8 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'gosen': gen_5000,
 		'pjskpf': pjskpf,
 		'amikaiden': amIkaiden,
-		'minfo': maisearch,
+		'minfo': mai_music_search,
+		'mwhat':mai_alias_search,
 		'logs': fetch_logs,
 	}
 	'''
@@ -1417,6 +1418,7 @@ def mai_best(datalist,callerid,roomid = None):
 	if gamertag[0][0] == '-1':
 		ws.send(send_msg('您未绑定maimai查分器ID。请使用Bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。',roomid))
 		return
+
 	user_data = mai_api_get(gamertag)
 	if user_data == -2:
 		ws.send(send_msg('该用户选择不公开数据。',roomid))
