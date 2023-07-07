@@ -2,6 +2,8 @@
 
 import websocket,time,json,requests,os,rel,sqlite3,brotli
 import random,string,traceback
+from datetime import datetime
+from pytz import timezone
 from threading import Thread
 from bs4 import BeautifulSoup
 from colorama import init
@@ -696,10 +698,9 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'constable': constable,
 		'addalias': addalias,
 		'gosen': gen_5000,
-		'pjskpf': pjskpf,
-		'amikaiden': amIkaiden,
 		'minfo': mai_music_search,
 		'mwhat':mai_alias_search,
+		'mupdate': mai_update,
 		'logs': fetch_logs,
 	}
 	'''
@@ -710,50 +711,59 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	else:
 		output(f'{nickname}: {keyword}','CALL','HIGHLIGHT')
 
-
 	'''
 	Call individual function
 	'''
 	real_data = call_data[1:]
 	send_function = send_msg
 
-
 	# Best XX Function runs on a seperate thread
+	# Depreciated as Arcaea API limit
 	if call_data[0][0].lower() == 'b' and call_data[0][1:].isdigit():
-		real_data = call_data[1:]
-		real_data.insert(0,int(call_data[0][1:]))
-		ws.send(send_msg('这可能需要一会,请耐心等待。',destination))
-		tbest = Thread(target=arc_best,args = (real_data,callerid,destination))
-		tbest.start()
+		ws.send(send_msg('Arcaea分数相关功能因Estertion查分器下线原因暂停使用。',destination))
+		# real_data = call_data[1:]
+		# real_data.insert(0,int(call_data[0][1:]))
+		# tbest = Thread(target=arc_best,args = (real_data,callerid,destination))
+		# tbest.start()
 		return
 
-	# MAIMAI Best 40 runs on a seperate thread
-	if call_data[0].lower() == 'mb40':
-		real_data = []
+	# Arc Recent Depreciated
+	elif call_data[0].lower() == 'arcrecent':
+		ws.send(send_msg('Arcaea分数相关功能因Estertion查分器下线原因暂停使用。',destination))
+		return
+
+	# MAIMAI Best 40 is Depreciated
+	elif call_data[0].lower() == 'mb40':
+		ws.send(send_msg('请移步maimai b50。\n指令: mb50',destination))
+		return
+
+	# MAIMAI Best 50 runs on a seperate thread
+	elif call_data[0].lower() == 'mb50':
+		real_data = call_data[1:]
+		# if a player name is given
+		if real_data:
+			real_data.insert(0,True)
+		else:
+			real_data = [True]
 		ws.send(send_msg('正在获取',destination))
 		tmb40 = Thread(target=mai_best,args = (real_data,callerid,destination))
 		tmb40.start()
 		return
 
 	# Project Sekai Event fetch runs on a seperate thread
-	if call_data[0].lower() == 'pjskevent':
-		tpjsk = Thread(target = ongoingEvent,args = (real_data,callerid,destination))
-		tpjsk.start()
+	elif call_data[0].lower() == 'pjskevent' or call_data[0].lower() =='pjskpf' or call_data[0].lower() == 'amIkaiden':
+		ws.send(send_msg('pjsk相关功能正在维修中',destination))
+		# tpjsk = Thread(target = ongoingEvent,args = (real_data,callerid,destination))
+		# tpjsk.start()
 		return
 
 	# anime tracing runs on a seperate thread
-	if call_data[0].lower() == 'whatanime':
+	elif call_data[0].lower() == 'whatanime':
 		tani = Thread(target = anime_by_url,args = (real_data,callerid,destination))
 		tani.start()
 		return
 
-	# arcrecent runs on a seperate thread
-	if call_data[0].lower() == 'arcrecent':
-		tarcre = Thread(target = arc_recent,args = (real_data,callerid,destination))
-		tarcre.start()
-		return
-
-	if call_data[0].lower() == 'help':
+	elif call_data[0].lower() == 'help':
 		ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',destination))
 		return
 
@@ -912,7 +922,8 @@ def patstat(datalist,callerid,roomid = None):
 	# ws.send(send_msg(f"你总共拍了我{patTimes}次{react}",dest))
 
 def today_is_friday_in_california(datalist,callerid,roomid = None):
-	if int(time.strftime("%w")) == 5:
+	california = timezone('America/Los_Angeles')
+	if int(datetime.now(california).strftime("%w")) == 5:
 		ws.send(send_attatch(f'{resource_path}\\Friday\\Today is Friday in California.mp4',roomid))
 		return ['Today is Friday in California.']
 	return ['Today is not Friday in California.']
@@ -1413,37 +1424,31 @@ def anilist_fetchfromid(query:str,vars_: dict):
 def mai_best(datalist,callerid,roomid = None):
 	conn_thread = sqlite3.connect('./windbotDB.db')
 	cur_thread = conn_thread.cursor()
+	if len(datalist) > 1:
+		gamertag = datalist[1]
+	else:
+		gamertag = sql_fetch(cur_thread,'Users',['maiID'],f"wxid = '{callerid}'")[0][0]
+		if gamertag == '-1':
+			ws.send(send_msg('您未绑定maimai查分器ID。请使用Bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。',roomid))
+			return
 
-	gamertag = sql_fetch(cur_thread,'Users',['maiID'],f"wxid = '{callerid}'")
-	if gamertag[0][0] == '-1':
-		ws.send(send_msg('您未绑定maimai查分器ID。请使用Bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。',roomid))
-		return
+	b50 = datalist[0]
+	image = draw_best_image(gamertag,b50)
 
-	user_data = mai_api_get(gamertag)
-	if user_data == -2:
+	if image == -2:
 		ws.send(send_msg('该用户选择不公开数据。',roomid))
 		return
-	elif user_data == -1:
-		ws.send(send_msg(f'请检查您绑定的查分器用户ID。目前绑定: {gamertag[0][0]}',roomid))
+	elif image == -1:
+		ws.send(send_msg(f'请检查您绑定的查分器用户ID。目前绑定: {gamertag}',roomid))
 		return
-	elif user_data == 0:
+	elif image == 0:
 		ws.send(send_msg('发生未知错误。',roomid))
 		return
-	ra = user_data['rating']
-	add_ra = user_data['additional_rating']
-	nickname = user_data['nickname']
-	sd_best = list(user_data['charts']['sd'])
-	dx_best = list(user_data['charts']['dx'])
-	output_file = open(f"{resource_path}\\MaiBest\\%s MaiB40.txt" % nickname,'w',encoding = 'UTF-8')
-	output_file.write(f'{nickname} | Rating: {ra+add_ra}(Base {ra} + Rank {add_ra})')
-	output_file.write('\n[========当前版本B15========]\n')
-	for song in dx_best:
-		output_file.write(process_record(song))
 
-	output_file.write('\n[=========旧版本B25========]\n')
-	for song in sd_best:
-		output_file.write(process_record(song))
-	ws.send(send_attatch(f"{resource_path}\\MaiBest\\%s MaiB40.txt" % nickname,roomid))
+	store_path = os.path.join(resource_path,'MaiBest')
+	image = image.save(os.path.join(store_path,f'{gamertag}.png'))
+
+	ws.send(send_attatch(os.path.join(store_path,f'{gamertag}.png'),roomid))
 
 ########################## MANAGING FUNCTIONS ##############################
 def ban(datalist,callerid,roomid):
