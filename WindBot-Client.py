@@ -438,17 +438,15 @@ def handle_wxuser_list(j):
 	for item in j['content']:
 		i+=1
 		output(f"{i} {item['wxid']} {item['name']}")
-
 		if item['wxid'][-8:] == 'chatroom':
-			sql_insert(conn,cur,'Groupchats',['roomid','groupname'],[item['wxid'][:-9],item['name']])
+			res = sql_fetch(cur,'Groupchats',['*'],f"roomid = '{item['wxid'][:-9]}'")
+			if len(res) == 0:
+				sql_insert(conn,cur,'Groupchats',['roomid','groupname'],[item['wxid'][:-9],item['name']])
 			sql_update(conn,'Groupchats','groupname',item['name'],f"roomid = '{item['wxid'][:-9]}'")
 		else:
 			sql_insert(conn,cur,'Users',['wxid','wxcode','realUsrName'],[item['wxid'],item['wxcode'],item['name']])
 
-
 	ws.send(get_chatroom_memberlist(item['wxid']))
-
-	# output('启动完成')
 
 ################################# INITIALIZE ###############################
 def heartbeat(msgJson):
@@ -465,9 +463,10 @@ def on_open(ws):
 	#初始化
 	ws.send(send_wxuser_list())
 	for wxid in OP_list:
-		# output(wxid)
 		sql_update(conn,'Users','powerLevel',3,f"wxid = '{wxid}'")
 
+	now=time.strftime("%Y-%m-%d %X")
+	ws.send(send_msg(f'启动完成\n{now}',OP_list[0]))
 	# ws.send(get_chatroom_memberlist())
 
 def on_error(ws,error):
@@ -517,7 +516,8 @@ def sql_initialize_users():
 def sql_initialize_groupnames():
 	initialize_gn = f'''CREATE TABLE IF NOT EXISTS Groupchats
 			(roomid TEXT,
-			groupname TEXT);'''
+			groupname TEXT
+			announce BOOL NOT NULL DEFAULT 0);'''
 	conn.execute(initialize_gn)
 	conn.commit()
 
@@ -664,8 +664,7 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	caller_isbanned = sql_fetch(cur,'Users',['banned'],f"wxid = '{callerid}'")
 	if caller_isbanned[0][0] == 1:
 		return
-
-	call_data = keyword.split(' ')
+	call_data = stringQ2B(keyword).split(' ')
 	if len(call_data) == 0:
 		ws.send('请指明需要调用的功能。')
 		return
@@ -675,33 +674,35 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 
 	functions = {
 		'bind': bindID,
-		'alookup': arc_lookup,
-		'whatis': whatis,
 		'patstat': patstat,
-		'friday': today_is_friday_in_california,
+		'gosen': gen_5000,
 		'ban': ban,
 		'unban':unban,
 		'refresh': refresh,
 		'setadmin':setadmin,
 		'punch':punch,
 		'setsuper': setsuper,
-		'link':arc_link,
-		'stoplink':arc_link_destroy,
-		'signup':arc_signup,
-		'search': search,
-		'linkselect': arc_link_select,
-		'linkstart': arc_link_start,
-		'quitlink': arc_link_quit,
-		'random': arc_random,
-		'ainfo': chartdetail,
+		'announce': announce,
+		'annswitch': switch_announce,
+		'annview': view_announce,
+		'logs': fetch_logs,
+
+		'ainfo': arc_music_search,
+		'randarc': arc_random,
+		'acinfo': arc_chart_info,
+		'alookup': arc_lookup,
+		'awhat': arc_alias_search,
 		'grablevel': grablevel,
 		'constable': constable,
 		'addalias': addalias,
-		'gosen': gen_5000,
+
 		'minfo': mai_music_search,
 		'mwhat':mai_alias_search,
 		'mupdate': mai_update,
-		'logs': fetch_logs,
+
+		'pjskpf': pjskpf,
+		'pwhat': pjsk_alias_search,
+		'amikaiden': amIkaiden,
 	}
 	'''
 	Terminal Log
@@ -721,10 +722,6 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	# Depreciated as Arcaea API limit
 	if call_data[0][0].lower() == 'b' and call_data[0][1:].isdigit():
 		ws.send(send_msg('Arcaea分数相关功能因Estertion查分器下线原因暂停使用。',destination))
-		# real_data = call_data[1:]
-		# real_data.insert(0,int(call_data[0][1:]))
-		# tbest = Thread(target=arc_best,args = (real_data,callerid,destination))
-		# tbest.start()
 		return
 
 	# Arc Recent Depreciated
@@ -751,10 +748,9 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		return
 
 	# Project Sekai Event fetch runs on a seperate thread
-	elif call_data[0].lower() == 'pjskevent' or call_data[0].lower() =='pjskpf' or call_data[0].lower() == 'amIkaiden':
-		ws.send(send_msg('pjsk相关功能正在维修中',destination))
-		# tpjsk = Thread(target = ongoingEvent,args = (real_data,callerid,destination))
-		# tpjsk.start()
+	elif call_data[0].lower() == 'pjskev':
+		tpjsk = Thread(target = pjsk_curr_event,args = (real_data,callerid,destination))
+		tpjsk.start()
 		return
 
 	# anime tracing runs on a seperate thread
@@ -843,8 +839,8 @@ def handle_recv_msg(msgJson):
 			ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',msgJson['wxid']))
 		else:
 			ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpDM.jpeg',msgJson['wxid']))
-	elif keyword == 'linkhelp':
-		ws.send(send_attatch(f'{resource_path}\\Help\\WindbotLinkHelp.jpg',msgJson['wxid']))
+	# elif keyword == 'linkhelp':
+		# ws.send(send_attatch(f'{resource_path}\\Help\\WindbotLinkHelp.jpg',msgJson['wxid']))
 	elif keyword=='ding':
 		ws.send(send_msg('dong',wxid=msgJson['wxid']))
 	elif keyword=='dong':
@@ -853,6 +849,26 @@ def handle_recv_msg(msgJson):
 		if roomid:
 			ws.send(send_msg('WB很不喜欢单走一个6哦',wxid=msgJson['wxid']))
 			# ban([msgJson['id1']],OP_list[0],msgJson['wxid'])
+	elif keyword == '‎‎':
+		replies = ['‎‎','全ては一つの幸福に集约された。今日という日は人类が真の幸切った辉かしい历史の転换である','U,INVERSE']
+		ws.send(send_msg(random.choice(replies),wxid=msgJson['wxid']))
+	elif keyword == 'friday' or keyword == 'Friday':
+		ws.send(send_msg(today_is_friday_in_california(msgJson['wxid']),wxid = msgJson['wxid']))
+
+def Q2B(uchar):
+    """单个字符 全角转半角"""
+    inside_code = ord(uchar)
+    if inside_code == 0x3000:
+        inside_code = 0x0020
+    else:
+        inside_code -= 0xfee0
+    if inside_code < 0x0020 or inside_code > 0x7e: #转完之后不是半角字符返回原来的字符
+        return uchar
+    return chr(inside_code)
+
+def stringQ2B(ustring):
+    """把字符串全角转半角"""
+    return "".join([Q2B(uchar) for uchar in ustring])
 
 ######################### ON MSG SWITCH #####################################
 def on_message(ws,message):
@@ -921,12 +937,12 @@ def patstat(datalist,callerid,roomid = None):
 	return [message,patTimes]
 	# ws.send(send_msg(f"你总共拍了我{patTimes}次{react}",dest))
 
-def today_is_friday_in_california(datalist,callerid,roomid = None):
+def today_is_friday_in_california(roomid = None):
 	california = timezone('America/Los_Angeles')
 	if int(datetime.now(california).strftime("%w")) == 5:
 		ws.send(send_attatch(f'{resource_path}\\Friday\\Today is Friday in California.mp4',roomid))
-		return ['Today is Friday in California.']
-	return ['Today is not Friday in California.']
+		return 'Today is Friday in California.'
+	return 'Today is not Friday in California.'
 
 def gen_5000(datalist,callerid,roomid):
 	if len(datalist) == 0:
@@ -943,387 +959,9 @@ def gen_5000(datalist,callerid,roomid):
 	return ['']
 
 #-----Arcaea-----
-def arc_best(datalist,callerid,roomid = None):
-	conn_thread = sqlite3.connect('./windbotDB.db')
-	cur_thread = conn_thread.cursor()
-
-	clear_list = ['Track Lost', 'Normal Clear', 'Full Recall', 'Pure Memory', 'Easy Clear', 'Hard Clear']
-	diff_list = ['PST', 'PRS', 'FTR', 'BYD']
-
-	wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
-
-	userid = sql_fetch(cur_thread,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
-
-	if userid == -1:
-		ws.send(send_msg('您未绑定ArcaeaID。请使用Bind指令绑定。',roomid))
-		return
-	try:
-		num = int(datalist[0])
-	except Exception as e:
-		ws.send(send_msg('请指明有效获取数。',roomid))
-		return
-	if num < 1 or num > 100:
-		ws.send(send_msg('非有效获取数。',roomid))
-		return
-
-	if len(datalist) > 1:
-		userid = datalist[1]
-	output(f"Fetching best {num} for {userid}")
-
-	wsarc.send(str(userid))
-
-	buffer = ""
-	scores = []
-	userinfo = {}
-	song_title = {}
-	count = 0
-
-	while buffer != "bye":
-		# output('got buWffer')
-		try:
-			buffer = wsarc.recv()
-		except websocket._exceptions.WebSocketConnectionClosedException:
-			ws.send(send_msg(f'查分服务器关闭了链接。\n这可能是用户绑定错误ID导致，也可能是网络原因。\n您现在绑定的arcID: {userid}',roomid))
-			return
-
-		if type(buffer) == type(b''):
-			obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
-			# output(obj)
-			# al.append(obj)
-			if obj['cmd'] == 'songtitle':
-				song_title = obj['data']
-			elif obj['cmd'] == 'scores':
-				count += 1
-				scores += obj['data']
-				if count % 10 == 0:
-					output(f'Got {count} songs.')
-			elif obj['cmd'] == 'userinfo':
-				userinfo = obj['data']
-				#Put In WINDOWS LOCATION
-				output_file = open(f"{resource_path}\\Best\\%s Best.txt" % userinfo['name'],'w',encoding = 'UTF-8')
-				# output_file = open("./Best/%s Best.txt" % userinfo['name'],'w')
-
-	scores.sort(key=cmp, reverse=True)
-
-	output('数据已拿全,正在整理')
-
-	output_file.write("%s's Top %d Songs:\n" % (userinfo['name'], num))
-	for j in range(0, int((num - 1) / 15) + 1):
-		for i in range(15 * j, 15 * (j + 1)):
-			if i >= num:
-				break
-			try:
-				score = scores[i]
-			except IndexError:
-				break
-			output_file.write("#%d  %s  %s %.1f  \n\t%s\n\tPure: %d(%d)\n\tFar: %d\n\tLost: %d\n\tScore: %d\n\tRating: %.2f\n" % (i+1, song_title[score['song_id']]['en'], diff_list[score['difficulty']], score['constant'], clear_list[score['clear_type']],score["perfect_count"], score["shiny_perfect_count"], score["near_count"], score["miss_count"], score["score"], score["rating"]))
-
-	ws.send(send_attatch(f"{resource_path}\\Best\\{userinfo['name']} Best.txt",roomid))
-
-def arc_recent(datalist,callerid,roomid = None):
-	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
-	cur = conn.cursor()
-	arcdb = sqlite3.connect(f'{project_path}\\arcsong.db')
-	arcur = arcdb.cursor()
-	clear_list = ['Track Lost', 'Normal Clear', 'Full Recall', 'Pure Memory', 'Easy Clear', 'Hard Clear']
-	diff_list = ['PST', 'PRS', 'FTR', 'BYD']
-
-	wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
-
-	userid = sql_fetch(cur,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
-	# output(userid)
-
-	if userid == -1:
-		ws.send(send_msg('您未绑定ArcaeaID。请使用Bind指令绑定。',roomid))
-		return
-
-	wsarc.send(f"{userid} -1 -1")
-	# output('sent')
-	buffer = ""
-	scores = []
-	userinfo = {}
-	song_title = {}
-	while buffer != "bye":
-		try:
-			buffer = wsarc.recv()
-		except websocket._exceptions.WebSocketConnectionClosedException:
-			wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
-			wsarc.send(f"{userid} -1 -1")
-		if type(buffer) == type(b''):
-			# print("recv")
-			obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
-			# output(obj)
-			# al.append(obj)
-			if obj['cmd'] == 'userinfo':
-				userinfo = obj['data']
-				name = userinfo['name']
-				recent_song = userinfo['recent_score'][0]
-
-				# output('---------')
-				# output(recent_song)
-
-				sid = recent_song['song_id']
-				diff = diff_list[recent_song['difficulty']]
-				constant = recent_song['constant']
-				score = recent_song['score']
-				perfect = recent_song['perfect_count']
-				shiny_p = recent_song['shiny_perfect_count']
-				far = recent_song['near_count']
-				miss = recent_song['miss_count']
-				played_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(int(recent_song['time_played']/1000)))
-
-				cleartype = clear_list[recent_song['clear_type']]
-				best_cleartype = clear_list[recent_song['best_clear_type']]
-				single_rating = recent_song['rating']
-				song_detail = sql_fetch(arcur,'charts',['name_en','name_jp','artist'],f"song_id = '{sid}'")
-
-				en_name = song_detail[0][0]
-				jp_name = song_detail[0][1]
-				artist = song_detail[0][2]
-
-				if jp_name:
-					answer_txt = f"Recent Play:\n{artist} - {en_name}({jp_name}) ({diff} {constant})\n{score} {cleartype} ({best_cleartype})\nPerfect: {perfect}({shiny_p})\nFar: {far}\nMiss: {miss}\nRating: %.3f\nTime: {played_time}" % single_rating
-				else:
-					answer_txt = f"Recent Play:\n{artist} - {en_name} ({diff} {constant})\n{score} {cleartype} ({best_cleartype})\nPerfect: {perfect}({shiny_p})\nFar: {far}\nMiss: {miss}\nRating: %.3f\nTime: {played_time}" % single_rating
-				ws.send(send_msg(answer_txt,roomid))
-				return [answer_txt,score,name]
-	ws.send(send_msg('出现了一些问题。',roomid))
-	return
-
 def constable(datalist,callerid,roomid = None):
 	ws.send(send_attatch(f'{resource_path}\\ArcaeaConstantTable.jpg',roomid))
 	return ['']
-
-#-----Arcaea Link-----
-def arc_room_id():
-	alphabet = string.ascii_lowercase + string.digits
-	return 'LR'+''.join(random.choices(alphabet, k=8))
-
-def arc_link(datalist,callerid,roomid = None):
-	user_status = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
-	if user_status != '-1':
-		return ['您已在房间中。']
-
-	user_arcID = sql_fetch(cur,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
-	if user_arcID == -1:
-		return ['您未绑定ArcaeaID。请使用Bind指令绑定。']
-
-	allselect = -1
-
-	if len(datalist) > 0:
-		if datalist[0] == 'a' or datalist[0] == 'all':
-			allselect = 1
-		else:
-			return[f'没有为{datalist[0]}的模式。']
-
-	room_id = arc_room_id()
-	sql_initialize_link(room_id,allselect)
-	ws.send(send_msg(f'您的房间号是:',roomid))
-	time.sleep(0.3)
-	ws.send(send_msg(f'{room_id}',roomid))
-	return arc_signup([room_id],callerid,isOwner = True)
-
-def arc_signup(datalist,callerid,roomid = None,isOwner = None):
-	user_status = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
-	if user_status != '-1':
-		return ['您已在房间中。']
-
-	user_arcID = sql_fetch(cur,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
-	if user_arcID == -1:
-		return ['您未绑定ArcaeaID。请使用Bind指令绑定。']
-
-	link_room_id = datalist[0]
-	if isOwner:
-		isOwner = 1
-		can_select = 1
-	else:
-		isOwner = 0
-		can_select = -1
-
-		is_all = sql_fetch(cur,link_room_id,['allselect'])
-		if is_all[0][0] == 1:
-			can_select = 1
-
-	try:
-		sql_insert(conn,cur,link_room_id,['wxid','arcID','songselect','isOwner'],[callerid,user_arcID,can_select,isOwner])
-	except Exception as e:
-		return ['房间号错误或不存在。']
-
-	sql_update(conn,'Users','isInLink',link_room_id,f"wxid = '{callerid}'")
-
-	link_player_cnt = len(sql_fetch(cur,link_room_id,['wxid']))
-	return [f'加入成功。目前房间内有{link_player_cnt}人。']
-
-def arc_link_destroy(datalist,callerid,roomid = None):
-	if len(datalist) == 0:
-		link_room_id = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
-		if link_room_id == '-1':
-			return ['您不在房间中。']
-	else:
-		link_room_id = datalist[0]
-
-	user_is_owner = sql_fetch(cur,link_room_id,['isOwner'],f"wxid = '{callerid}'")
-	if len((user_is_owner)) == 0:
-		return ['出现错误。可能是房间ID输入错误。']
-	user_is_owner = user_is_owner[0][0]
-
-	user_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")[0][0]
-
-	if user_is_owner != 1:
-		if user_level < 2:
-			return ['您没有权限结束该房间。']
-
-	room_users = sql_fetch(cur,link_room_id,['wxid'])
-
-	sql_destroy(conn,link_room_id)
-
-	for wxid in room_users:
-		wxid = wxid[0]
-		sql_update(conn,'Users','isInLink',-1,f"wxid = '{wxid}'")
-	output(f'Stopped Link Play Room of ID {link_room_id}','STOP_LINK',background = "WHITE")
-	return ['房间已结束。']
-
-def arc_link_select(datalist,callerid,roomid):
-	link_room_id = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
-	if link_room_id == '-1':
-		return['您不在房间中。']
-
-	user_can_select = sql_fetch(cur,link_room_id,['songselect'],f"wxid = '{callerid}'")[0]
-	if user_can_select[0] != 1:
-		return ['您没有选择歌曲的权限。']
-
-	song_started = sql_fetch(cur,link_room_id,['songStarted'])[0][0]
-	if song_started == 1:
-		return ['已有进行中的歌曲。']
-
-	keyword = ''
-	for word in datalist[0:]:
-		keyword += (word + ' ')
-	keyword = keyword[:-1]
-	selected_song = sql_fetch(arcur,'charts',condition = f"name_en = '{keyword}'")
-
-	if len(selected_song) == 0:
-		sid = whatis([f"{keyword}"],callerid)[1]
-		if sid == -1:
-			return['没有找到相关歌曲。']
-	else:
-		sid = selected_song[0][0]
-
-	if len(selected_song) > 4:
-		ws.send(send_msg('啊哈 是重名歌曲 默认选Quon(Lanota)哦\n选Quon(wacca)的话直接说quon2 我懒（',roomid))
-
-	chart_detail = sql_fetch(arcur,'charts',condition = f"song_id = '{sid}'")
-
-	level = chart_detail[0]
-	en_name = level[2]
-	jp_name = level[3]
-	artist = level[4]
-
-	sql_update(conn,link_room_id,'song',sid)
-
-	if jp_name:
-		reply_txt = f'已选择歌曲: {artist} - {en_name}({jp_name})'
-	else:
-		reply_txt = f'已选择歌曲: {artist} - {en_name}'
-	return [reply_txt]
-
-def arc_link_start(datalist,callerid,roomid = None):
-	link_room_id = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
-	if link_room_id == '-1':
-		return ['您不在房间中。']
-
-	user_can_start = sql_fetch(cur,link_room_id,['songselect'],f"wxid = '{callerid}'")[0][0]
-
-	if user_can_start != 1:
-		return ['您没有权限开始。']
-
-	song = sql_fetch(cur,link_room_id,['song'])[0][0]
-	if song == '-1':
-		return ['没有选择歌曲。']
-
-	song_started = sql_fetch(cur,link_room_id,['songStarted'])[0][0]
-	if song_started == 1:
-		return ['已有进行中的歌曲。']
-
-	ws.send(send_msg('歌曲将在5秒钟后开始。',roomid))
-
-	t = Thread(target=arc_link_results,args = (link_room_id,roomid))
-	t.start()
-	sql_update(conn,link_room_id,'songStarted',1)
-	time.sleep(5)
-
-	return ['已开始计时。']
-
-def arc_link_results(link_room_id,destination):
-	conn_thread = sqlite3.connect('./windbotDB.db')
-	cur_thread = conn_thread.cursor()
-
-	arcdb_thread = sqlite3.connect('./arcsong.db')
-
-	diff_lvl = ['PST', 'PRS', 'FTR', 'BYD']
-
-	arcur_thread = arcdb_thread.cursor()
-	players = [p[0] for p in sql_fetch(cur_thread,link_room_id,['arcID'])]
-	link_song = sql_fetch(cur_thread,link_room_id,['song'])[0][0]
-	chart_detail = sql_fetch(arcur_thread,'charts',condition = f"song_id = '{link_song}'")[0]
-	link_time = chart_detail[8]
-	results = {}
-	reply_txt = "下面是结果！\n"
-
-	time.sleep(link_time+25)
-
-	for p in players:
-		wsarc_thread = websocket.create_connection("wss://arc.estertion.win:616/")
-		wsarc_thread.send(f"{p} -1 -1")
-		buffer = ""
-		scores = []
-		userinfo = {}
-		song_title = {}
-		while buffer != "bye":
-			try:
-				buffer = wsarc_thread.recv()
-			except websocket._exceptions.WebSocketConnectionClosedException:
-				wsarc_thread = websocket.create_connection("wss://arc.estertion.win:616/")
-				wsarc_thread.send(f"{p} -1 -1")
-			if type(buffer) == type(b''):
-				obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
-				# output(obj)
-				if obj['cmd'] == 'userinfo':
-					userinfo = obj['data']
-					name = userinfo['name']
-					recent_song = userinfo['recent_score'][0]
-
-					sid = recent_song['song_id']
-					diff = recent_song['difficulty']
-					score = recent_song['score']
-
-					if sid == link_song:
-						results[name] = [score,diff]
-					else:
-						results[name] = -1
-	i = 1
-	for p,s in sorted(results.items(), key=lambda p:p[1][0]):
-		reply_txt += f"{i}位！ [{diff_lvl[s[1]]}] {p} {s[0]}\n"
-		i += 1
-	ws.send(send_msg(reply_txt,destination))
-	sql_update(conn_thread,link_room_id,'songStarted',0)
-
-def arc_link_quit(datalist,callerid,roomid):
-	link_room_id = sql_fetch(cur,'Users',['isInLink'],f"wxid = '{callerid}'")[0][0]
-	if link_room_id == '-1':
-		return ['您不在房间中。']
-
-	song_started = sql_fetch(cur,link_room_id,['songStarted'])[0][0]
-	if song_started == 1:
-		return ['歌曲正在进行中。']
-
-	link_player_cnt = len(sql_fetch(cur,link_room_id,['wxid']))
-	if link_player_cnt == 1:
-		arc_link_destroy([link_room_id],OP_list[0],roomid)
-		return['最后一位玩家退出房间。已结束房间。']
-
-	sql_delete(conn,link_room_id,f"wxid = '{callerid}'")
-	return ['您已退出房间。']
 
 #-----PJSK-----
 def ongoingEvent(datalist,callerid,roomid):
@@ -1510,7 +1148,6 @@ def unban(datalist,callerid,roomid):
 
 def refresh(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
-	# output(caller_level)
 
 	if caller_level[0][0] < 3:
 		return ['您的权限不足。']
@@ -1593,12 +1230,64 @@ def fetch_logs(datalist,callerid,roomid = None):
 
 	return [reply_txt]
 
+def announce(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	if caller_level[0][0] < 3:
+		return ['您的权限不足。']
+	groups = sql_fetch(cur,'Groupchats',['*'],"announce = 1")
+	if len(groups) == 0:
+		return ['目前没有群聊开启消息推送']
+
+	content = '[推送公告]\n'
+	for w in datalist:
+		content += w + ' '
+
+	reply_txt = f"内容:{content}\n已向以下群聊推送消息:\n"
+	for g in groups:
+		ws.send(send_msg(content,g[0]+'@chatroom'))
+		reply_txt += f"{g[1]}({g[0]})\n"
+	return [reply_txt]
+
+def switch_announce(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	if caller_level[0][0] < 3:
+		return ['您的权限不足。']
+
+	if '@chatroom' not in roomid:
+		if len(datalist) == 0:
+			return ['请提供群组ID。']
+		elif not datalist[0].isnumeric():
+			return ['请提供纯数字的群组ID。']
+		roomid = int(datalist[0])
+	else:
+		roomid = roomid[:-9]
+
+	announce_status = sql_fetch(cur,'Groupchats',['announce'],f"roomid = '{roomid}'")
+	if len(announce_status) == 0:
+		return [f'群组ID{roomid}不存在']
+
+	ann = (announce_status[0][0] + 1) % 2
+	sql_update(conn,'Groupchats','announce',ann,f"roomid = '{roomid}'")
+
+	reply_txt = f'群组公告:{bool(ann)}'
+	return [reply_txt]
+
+def view_announce(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	if caller_level[0][0] < 3:
+		return ['您的权限不足。']
+	reply_txt = '群组推送情况:\n'
+	announce_status = sql_fetch(cur,'Groupchats',['*'])
+	for group in announce_status:
+		reply_txt += f'{group[1]} ({group[0]}): {bool(group[2])}\n'
+	return [reply_txt]
+
 ################################ MAIN #######################################
 if __name__ == "__main__":
 	''' Initialize SQL'''
 	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
 	cur = conn.cursor()
-	# conn.execute('''ALTER TABLE Users ADD COLUMN pjskID NUMBER NOT NULL DEFAULT -1''')
+	# conn.execute('''ALTER TABLE Groupchats ADD COLUMN announce BOOL NOT NULL DEFAULT 0''')
 	sql_initialize_users()
 	sql_initialize_groupnames()	
 
