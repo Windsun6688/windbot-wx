@@ -19,4 +19,4 @@ pjsekai.moe API使用参考 Reference of pjsekai.moe API use [FLAG250/hoshino-pl
 
 maimai b50功能参考 Reference of maimai Best50 function [Yuri-YuzuChaN/maimaiDX](https://github.com/Yuri-YuzuChaN/maimaiDX)
 
-你 You
+你 You <font color=gray size=5>*Funding of this programme was made possible by viewers like you*</font>
