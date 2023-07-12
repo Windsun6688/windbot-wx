@@ -21,78 +21,9 @@ def arc_lookup(datalist,callerid,roomid = None):
     return [message,playerid]
     # ws.send(send_msg(f'{nickname}的好友码是{playerid}，PTT是%.2f。' % rating,dest))
 
-def arc_recent(datalist,callerid,roomid = None):
-    clear_list = ['Track Lost', 'Normal Clear', 'Full Recall', 'Pure Memory', 'Easy Clear', 'Hard Clear']
-    diff_list = ['PST', 'PRS', 'FTR', 'BYD']
-
-    wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
-
-    userid = sql_fetch(cur,'Users',['arcID'],f"wxid = '{callerid}'")[0][0]
-    # output(userid)
-
-    if userid == -1:
-        return ['您未绑定ArcaeaID。请使用Bind指令绑定。']
-
-    wsarc.send(f"{userid} -1 -1")
-    # output('sent')
-    buffer = ""
-    scores = []
-    userinfo = {}
-    song_title = {}
-    while buffer != "bye":
-        try:
-            buffer = wsarc.recv()
-        except websocket._exceptions.WebSocketConnectionClosedException:
-            wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
-            wsarc.send(userid)
-        if type(buffer) == type(b''):
-            # print("recv")
-            obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
-            # output(obj)
-            # al.append(obj)
-            if obj['cmd'] == 'userinfo':
-                userinfo = obj['data']
-                name = userinfo['name']
-                recent_song = userinfo['recent_score'][0]
-
-                # output('---------')
-                # output(recent_song)
-
-                sid = recent_song['song_id']
-                diff = diff_list[recent_song['difficulty']]
-                constant = recent_song['constant']
-                score = recent_song['score']
-                perfect = recent_song['perfect_count']
-                shiny_p = recent_song['shiny_perfect_count']
-                far = recent_song['near_count']
-                miss = recent_song['miss_count']
-                played_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(int(recent_song['time_played']/1000)))
-
-                cleartype = clear_list[recent_song['clear_type']]
-                best_cleartype = clear_list[recent_song['best_clear_type']]
-                single_rating = recent_song['rating']
-                song_detail = sql_fetch(arcur,'charts',['name_en','name_jp','artist'],f"song_id = '{sid}'")
-
-                en_name = song_detail[0][0]
-                jp_name = song_detail[0][1]
-                artist = song_detail[0][2]
-
-                if jp_name:
-                    answer_txt = f"Recent Play:\n{artist} - {en_name}({jp_name}) ({diff} {constant})\n{score} {cleartype} ({best_cleartype})\nPerfect: {perfect}({shiny_p})\nFar: {far}\nMiss: {miss}\nRating: %.3f\nTime: {played_time}" % single_rating
-                else:
-                    answer_txt = f"Recent Play:\n{artist} - {en_name} ({diff} {constant})\n{score} {cleartype} ({best_cleartype})\nPerfect: {perfect}({shiny_p})\nFar: {far}\nMiss: {miss}\nRating: %.3f\nTime: {played_time}" % single_rating
-
-                return [answer_txt,score,name]
-    return['出现了一些问题。']
-
-def cmp(a):
-    return a['rating']
-
-def whatis(datalist,callerid,roomid = None):
+def arc_alias_search(datalist,callerid,roomid = None):
     result = sql_fetch(arcur,'alias',['sid'],f"alias = '{datalist[0]}'")
-
     res_len = len(result)
-
     if res_len == 0:
         return ['没有找到相关歌曲 私密马赛',-1]
 
@@ -108,21 +39,12 @@ def whatis(datalist,callerid,roomid = None):
         en_name = level[2]
         jp_name = level[3]
         artist = level[4]
-        bpm = level[5]
-        pack = sql_fetch(arcur,'packages',['name'],f"id = '{level[7]}'")[0][0]
-
-        total_time = level[8]
-        mins = total_time // 60
-        secs = total_time - mins*60
-
-        sides = ['光','对立','无色']
-        side = sides[level[9]]
 
         jp_txt = ''
         if jp_name:
             jp_txt = f"({jp_name})"
 
-        reply_txt += f"{artist} - {en_name}{jp_txt}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, SongID为: {sid}\n"
+        reply_txt += f"{artist} - {en_name}{jp_txt} (SongID: {sid})\n"
 
         other_aliases = sql_fetch(arcur,'alias',['alias'],f"sid = '{sid}'")
         alias_list = [a[0] for a in other_aliases if a[0] != datalist[0]]
@@ -153,69 +75,80 @@ def addalias(datalist,callerid,roomid = None):
     sql_insert(arcdb,arcur,'alias',['sid','alias'],[sid,alias])
     return [f'已添加别名{alias}至歌曲{sid}']
 
-def chartdetail(datalist,callerid,roomid = None):
-    song_name = datalist[0]
-    diff_lvl = {
-        'PST': 0,
-        'PRS': 1,
-        'FTR': 2,
-        'BYD': 3
-    }
-    if datalist[1].upper() not in diff_lvl.keys():
-        return ['没有该难度。']
-    difficulty = diff_lvl.get(datalist[1].upper())
-    chart_detail = sql_fetch(arcur,'charts',condition = f"name_en = '{song_name}' AND rating_class = {difficulty}")
-    if len(chart_detail) == 0:
-        sid = whatis([f"{song_name}"],callerid)[1]
-        if sid == -1:
-            return ['没有找到相关歌曲 私密马赛']
+def arc_chart_info(datalist,callerid,roomid = None):
+    diff_list = ['PST','PRS','FTR','BYD']
 
-        chart_detail = sql_fetch(arcur,'charts',condition = f"song_id = '{sid}' AND rating_class = {difficulty}")
-        if len(chart_detail) == 0:
-            return ['没有找到这张谱。']
+    keyword = ''
+    for word in datalist:
+        keyword += (word + ' ')
 
-    const = int(chart_detail[0][16])/10
-    note_cnt = chart_detail[0][17]
-    charter = chart_detail[0][18]
+    keyword = keyword.strip()
 
-    reply_txt = f"Const: {const} | Notes: {note_cnt} | Charter: {charter}"
+    res = sql_match(arcdb,arcur,'charts',['song_id'],'name_en',f'{keyword}')
+    if len(res) == 0:
+        res = sql_fetch(arcur,'charts',['song_id'],f"song_id = '{keyword}'")
+        if len(res)== 0:
+            res = sql_match(arcdb,arcur,'alias',['sid'],'alias',f'{keyword}')
+            if len(res) == 0:
+                return ['没有找到相关歌曲 私密马赛']
+    reply_txt = ''
+    sid = res[0][0]
+
+    if sid == 'lasteternity':
+        return ['onoken - Last | Eternity\nBYD 9.7 | Notes: 790 | Charter: Arcaea']
+
+    song_detail = sql_fetch(arcur,'charts',condition = f"song_id = '{sid}'")
+    diff_cnt = len(song_detail)
+
+    info_level = song_detail[0]
+    en_name = info_level[2]
+    jp_name = info_level[3]
+    artist = info_level[4]
+    if jp_name:
+        jp_name = f"({jp_name})"
+    reply_txt += f"{artist} - {en_name}{jp_name}\n"
+
+    for chart_diff in range(diff_cnt-1,-1,-1):
+        chart_detail = song_detail[chart_diff]
+        diff_level = diff_list[chart_diff]
+        difficulty = int(chart_detail[16])/10
+        note_cnt = chart_detail[17]
+        charter = chart_detail[18].replace('\n',' ')
+        reply_txt += f"{diff_level} {difficulty} | Notes: {note_cnt} | Charter: {charter}\n"
+
     return [reply_txt]
 
-def search(datalist,callerid,roomid = None):
-    diff_list = ['PST', 'PRS', 'FTR', 'BYD']
-
+def arc_music_search(datalist,callerid,roomid = None):
+    # Fuzzy Search
     if datalist[0].lower() == 'f':
         keyword = ''
         for word in datalist[1:]:
             keyword += (word + ' ')
-        keyword = keyword[:-1]
+        keyword = keyword.strip()
         # output(keyword,background = "MINT")
-
         result = sql_match(arcdb,arcur,'charts',['song_id'],'name_en',f'{keyword}')
         if len(result) == 0:
             result = sql_match(arcdb,arcur,'alias',['sid'],'alias',f'{keyword}')
             if len(result) == 0:
                 return['没有找到相关歌曲。']
-            # sid = whatis([f"{keyword}"],callerid)[1]
-            # if sid == -1:
-            # result = [[(sid)]]
+    # Precise Search
     else:
         keyword = ''
         for word in datalist[0:]:
             keyword += (word + ' ')
-        keyword = keyword[:-1]
-
-        # output(keyword,background = "MINT")
+        keyword = keyword.strip()
 
         result = sql_fetch(arcur,'charts',['song_id'],f"name_en = '{keyword}'")
         if len(result) == 0:
-            sid = whatis([f"{keyword}"],callerid)[1]
-            if sid == -1:
-                return['没有找到相关歌曲。']
-            result = [[(sid)]]
+            result = sql_fetch(arcur,'charts',['song_id'],f"song_id = '{keyword}'")
+            if len(result) == 0:
+                sid = arc_alias_search([f"{keyword}"],callerid)[1]
+                if sid == -1:
+                    return['没有找到相关歌曲。']
+                result = [[(sid)]]
 
+    # Remove Duplicate Results
     sids = list(set([s[0] for s in result]))
-    # output(sids,background = "MINT")
 
     if len(sids)>5:
         return['过多结果。请优化搜索词。']
@@ -223,8 +156,12 @@ def search(datalist,callerid,roomid = None):
     reply_txt = f"共找到{len(sids)}个结果:\n"
 
     for sid in sids:
+        last_append = False
         song_detail = sql_fetch(arcur,'charts',condition = f"song_id = '{sid}'")
-        # output(song_detail)
+        # Handle the special case of 'Last' and 'Last|Eternity'
+        if sid == 'lasteternity' or sid == 'last':
+            song_detail = sql_fetch(arcur,'charts',condition = "song_id = 'last'")
+            last_append = True
 
         level = song_detail[0]
         en_name = level[2]
@@ -235,32 +172,30 @@ def search(datalist,callerid,roomid = None):
 
         total_time = level[8]
         mins = total_time // 60
-        secs = total_time - mins*60
+        secs = total_time % 60
 
         sides = ['光','对立','无色']
         side = sides[level[9]]
-        unlock = ['不需要','需要']
-        world_unlock = unlock[level[10]]
+        unlock_list = ['不需要','需要']
+        world_unlock = unlock_list[level[10]]
+
         jacket_designer = level[19]
         bg = level[12]
-
+        version = level[14]
         bg_txt = ''
         jacket_txt = ''
         jp_txt = ''
         if jacket_designer:
-            jacket_txt = f", 封面绘师{jacket_designer}"
+            jacket_txt = f"封面绘师{jacket_designer}\n"
         if bg:
-            bg_txt = f", 有特殊背景{bg}"
+            bg_txt = f" | 特殊背景{bg}"
 
         if jp_name:
             jp_txt = f"({jp_name})"
 
-        reply_txt += f"{artist} - {en_name}{jp_txt}, BPM {bpm}, 时长 {mins}分{secs}秒, 是{side}侧歌曲, 来自{pack}包, {world_unlock}爬梯获得, {jacket_txt}{bg_txt}\n"
-
-        difficulty_cnt = len(song_detail)
+        reply_txt += f"{artist} - {en_name}{jp_txt}\nBPM {bpm} | 时长 {mins}分{secs}秒\n{side}侧 | {pack}包 | 版本{version}\n{world_unlock}爬梯获得{bg_txt}\n{jacket_txt}SID: {sid}\n"
 
         song_override = song_detail[-1][-1]
-        # output(song_override)
 
         if song_override == 1:
             byd_detail = song_detail[3]
@@ -278,25 +213,16 @@ def search(datalist,callerid,roomid = None):
 
             bg = byd_detail[12]
             if bg:
-                bg_txt = f", 有特殊背景{bg}"
+                bg_txt = f" | 特殊背景{bg}"
             else:
-                bg_txt = Nonel[19]
+                bg_txt = None
+            reply_txt += f"\n(!)选择该曲目BYD时会有新曲{artist} - {en_name}\nBPM {bpm} | 时长{mins}分{secs}秒\n难度{difficulty} | 谱师名义{charter} | Notes总数{note_cnt}{bg_txt}\n封面绘师{jacket_designer}\n"
 
-            reply_txt += f"(!)选择该曲目BYD时会有新曲{en_name}, 作者{artist}, BPM {bpm}, 时长{mins}分{secs}秒, 难度{difficulty}, 谱师名义{charter}, Notes总数{note_cnt}{bg_txt}, 封面绘师{jacket_designer}\n"
-            difficulty_cnt = 3
+        # Handle the Special Case of Last
+        if last_append:
+            reply_txt += f"(!!)选择角色光与对立(Reunion)时会有新曲onoken - Last | Eternity\nBPM 175 | 时长2分27秒\n难度9.7 | 谱师名义Arcaea | Notes总数790 | 特殊背景epilogue\n封面绘师シエラ\n"
 
-
-        for chart_diff in range(difficulty_cnt):
-            chart_detail = song_detail[chart_diff]
-            # output(chart_detail)
-            diff_level = diff_list[chart_diff]
-            difficulty = int(chart_detail[16])/10
-
-            note_cnt = chart_detail[17]
-            charter = chart_detail[18].replace('\n',' ')
-
-            reply_txt += f"{diff_level} {difficulty}\nNotes: {note_cnt} | Charter: {charter}\n"
-        reply_txt += "\n"
+        reply_txt += '\n'
     return[reply_txt]
 
 def grablevel(datalist,callerid,roomid = None):
@@ -324,11 +250,12 @@ def grablevel(datalist,callerid,roomid = None):
 def arc_random(datalist,callerid,roomid):
     if len(datalist) < 1:
         songs = list(set(sql_fetch(arcur,'charts')))
+        diff = 1
     else:
         diff = float(datalist[0]) * 10
         songs = sql_fetch(arcur,'charts',condition = f"rating = {diff}")
 
-    if len(songs) == 0:
+    if len(songs) == 0 or diff <= 0:
         return ['该难度没有歌曲。']
 
     random_id = random.randint(0,len(songs)-1)
@@ -432,7 +359,6 @@ def arc_random(datalist,callerid,roomid):
         "当然可以！推荐SONGNAME，它是一首非常有节奏感和强烈节拍感的电子音乐，每次的疾跑与扭曲像在体验律动与节奏的交织。它的中间段特别值得期待，有增速和加速的段落，可以让你体验到游戏难度上的突破和成长。玩它一遍足以成就一天的好心情。",\
         "当然可以！我再给您推荐一首SONGNAME。这首的节奏非常紧凑跳跃，充满着冒险的感觉。在色彩缤纷的背景音下，尤其是钢琴的部分，很容易让人深深印象，让您在游戏过程中彻底沉浸。跟着它的节奏一起跳跃，一起瞬间爆发，带领我们进入充满兴奋和活力的音乐旅程！",\
         "当然可以！推荐SONGNAME，这是一首非常欢快的歌曲，听起来充满活力和节奏感。曲中节奏变化多样，音符跃动特别灵动，让人难以坐底。无论是听得还是演奏都非常有趣，绝对是一首让人心情愉悦的曲子！"]
-
     jp_txt = ''
     if jp_name:
         jp_txt = f"({jp_name})"
@@ -442,3 +368,5 @@ def arc_random(datalist,callerid,roomid):
         reply_txt = reply_txt.replace("ARTIST",f'{artist}')
 
     return [reply_txt]
+
+
