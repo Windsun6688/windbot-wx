@@ -1,10 +1,14 @@
-import sqlite3
+import sqlite3,os
 ''' Initialize SQL'''
 conn = sqlite3.connect('./windbotDB.db')
 cur = conn.cursor()
 
 arcdb = sqlite3.connect('./arcsong.db')
 arcur = arcdb.cursor()
+
+'''Initialize Resource Path'''
+path = os.getcwd()
+resource_root = os.path.join(path,'Resources')
 
 def getid():
     return time.strftime("%Y%m%d%H%M%S")
@@ -51,6 +55,12 @@ def output(msg,logtype = 'SYSTEM',mode = 'DEFAULT',background = 'DEFAULT'):
         error_log_file = open('ErrorLog.txt','a')
         error_log_file.write(f"[{now} {logtype}] {msg}\n")
         error_log_file.close()
+
+    # Store Log into latest_logs list
+    if logtype != 'HEART_BEAT':
+        if len(latest_logs) == 20:
+            latest_logs.pop(0)
+        latest_logs.append(f"[{now} {logtype}] {msg}")
 
     # print("["+f"{color}[1;35m{LogType}{color}[0m"+"]"+' Success')
     # print(f'[{now}]:{msg}')
