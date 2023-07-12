@@ -22,13 +22,13 @@ BaseRa = [0.0, 5.0, 6.0, 7.0, 7.5, 8.5, 9.5, 10.5, 12.5, 12.7, 13.0, 13.2, 13.5,
 BaseRaSpp = [7.0, 8.0, 9.6, 11.2, 12.0, 13.6, 15.2, 16.8, 20.0, 20.3, 20.8, 21.1, 21.6, 22.4]
 
 ALIAS = {
-    'all': 'maimaidx_alias',
-    'songs': 'get_song',
-    'alias': 'get_song_alias',
-    'status': 'get_alias_status',
-    'apply': 'apply_alias',
-    'agree': 'agree_user',
-    'end': 'get_alias_end'
+    'all': 'MaimaiDXAlias',
+    'songs': 'GetSongs',
+    'alias': 'GetSongsAlias',
+    'status': 'GetAliasStatus',
+    'apply': 'ApplyAlias',
+    'agree': 'AgreeUser',
+    'end': 'GetAliasEnd'
 }
 
 def mai_api_get(gamertag: str, b50: bool = False,type: str = 'player'):
@@ -121,7 +121,7 @@ def mai_music_search(datalist,callerid,roomid = None):
         keyword = ''
         for word in datalist:
             keyword += (word + ' ')
-        keyword = keyword[:-1]
+        keyword = keyword.strip()
 
         # If user uses ID search
         if keyword.isnumeric():
@@ -226,21 +226,19 @@ def mai_alias_search(datalist,callerid,roomid = None):
     for word in datalist:
         keyword += (word)
 
-    for song in song_alias:
-        if keyword in song['Alias']:
-            results.append(song)
+    for sid in song_alias:
+        if keyword in song_alias[sid]['Alias']:
+            results.append([sid,song_alias[sid]['Name']])
 
     if len(results) == 0:
         return ['没有搜寻到结果,或搜索模式关键词错误。']
-    elif len(results) > 5:
+    elif len(results) > 10:
         return ['请尝试优化搜索词。']
 
     reply_txt = f"这个别名可能指向以下{len(results)}首歌:"
     cnt = 1
     for s in results:
-        sid = s['ID']
-        title = s['Name']
-        reply_txt += f"\n{cnt}.{title} (ID:{sid})"
+        reply_txt += f"\n{cnt}. {s[1]} (ID:{s[0]})"
         cnt += 1
 
     return [reply_txt]
@@ -262,22 +260,6 @@ def image_to_base64(img: Image.Image, format='PNG') -> str:
     byte_data = output_buffer.getvalue()
     base64_str = base64.b64encode(byte_data).decode()
     return 'base64://' + base64_str
-
-def Q2B(uchar):
-    """单个字符 全角转半角"""
-    inside_code = ord(uchar)
-    if inside_code == 0x3000:
-        inside_code = 0x0020
-    else:
-        inside_code -= 0xfee0
-    # 转完之后不是半角字符返回原来的字符
-    if inside_code < 0x0020 or inside_code > 0x7e:
-        return uchar
-    return chr(inside_code)
-
-def stringQ2B(ustring):
-    """把字符串全角转半角"""
-    return "".join([self._Q2B(uchar) for uchar in ustring])
 
 def is_cjk(character):
     """"
