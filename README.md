@@ -10,7 +10,7 @@ A Wechat chatbot which provides mainly rhythm-game-related features.
 ## :page_with_curl: 功能列表 Features List
 WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://maimai.sega.jp/) / [Project Sekai](https://pjsekai.sega.jp/) 相关的功能。
 <details>
-  <summary>主要功能</summary>
+  <summary>主要功能 Main Features</summary>
 
 - **Arcaea相关**: 查询歌曲信息，查询谱面信息，查询别名，获取指定定数所有曲目，定数表，随机曲目
 - **maimaiDX相关**: 查询歌曲&谱面信息，查询别名，best50图片生成
@@ -19,7 +19,7 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 </details>
 
 <details>
-  <summary>其他功能</summary>
+  <summary>其他功能 Other Features</summary>
   
 - 我想要五千兆系图片生成
 - 动画截图溯源
@@ -27,6 +27,14 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
   
 </details>
 
+## :card_file_box: 开发日志 Develop Log
+
+<details>
+  <summary>点我展开 Click To Expand</summary>
+
+- 2023.08.20
+  - 适配wxAPI更新，wx版本更新至至3.9.2.23
+</details>
 
 ## :gift_heart: 特别感谢 Thanks
 
