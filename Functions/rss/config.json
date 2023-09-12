@@ -1,0 +1,7 @@
+{
+	"rsshub": "https://rsshub.rssforever.com/",
+	"routes": {
+		"biliDynamic": "bilibili/user/dynamic/",
+		"fgoNews": "fgo/news"
+	}
+}
