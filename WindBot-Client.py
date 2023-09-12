@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
-import websocket,time,json,requests,os,rel,sqlite3,brotli,subprocess
-import random,string,traceback
+import websocket,json,requests,rel,sqlite3,subprocess
+import random,traceback
 from datetime import datetime
 from pytz import timezone
 from threading import Thread
@@ -400,7 +400,7 @@ def get_personal_detail(wxid):
 	qs={
 		'id':getid(),
 		'type':PERSONAL_DETAIL,
-		'content':'op:personal detail',
+		# 'content':'op:personal detail',
 		'wxid': wxid,
 		'roomid':'null',
 		'content':'null',
@@ -653,9 +653,8 @@ def handle_recv_pic(msgJson):
 		output(f'{roomname}-{nickname}: [IMAGE]','GROUPCHAT')
 	else:
 		senderid=msgJson['id1'] #个人id
-		destination = senderid
-
-		nickname = sql_fetch(cur,'Users',['realUsrName'],f"wxid = '{senderid}'")[0][0]
+		nickname = sql_fetch(cur,'Users',['realUsrName'],\
+							f"wxid = '{senderid}'")[0][0]
 		'''
 		Terminal Log
 		'''
@@ -1017,7 +1016,7 @@ def pjsk_curr_event(datalist,callerid,roomid = None):
         'street': 'Vivid Bad Squad','theme_park': 'Wonderlands x Showtime',\
         'school_refusal': '25时', 'none': '未指明不知道是哪个团但是感觉会很开心的'
     }
-    data , resp= pjsk_event_get(local = False)
+    data = pjsk_event_get(local = False)[0]
     event = load_event_info(data)
     end_text = '(进行中)' if event[-1] else '(已结束)'
     reply_txt = f'{unit_dict[event[4]]}活动！\n「{event[1]}」\n类型: {event_type_dict[event[3]]}\n结束时间: {event[2]} {end_text}'
@@ -1121,7 +1120,7 @@ def rss_trigger():
 def rss_push(feed):
 	conn_thread = sqlite3.connect('./windbotDB.db')
 	cur_thread = conn_thread.cursor()
-	groups = sql_fetch(cur,'Groupchats',['*'],"rssPush = 1")
+	groups = sql_fetch(cur_thread,'Groupchats',['*'],"rssPush = 1")
 	if len(groups) == 0:
 		ws.send(send_txt_msg('目前没有群聊开启rss推送',OP_LIST[0]))
 	else:
@@ -1162,7 +1161,7 @@ def ban(datalist,callerid,roomid):
 		if wxid[:4] != 'wxid':
 			try:
 				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
-			except Exception as e:
+			except Exception as _:
 				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
 				continue
 		if wxid in OP_LIST:
