@@ -1,8 +1,10 @@
-import requests,json,xmltodict,html2text,os,copy
+import requests,json,xmltodict,html2text,os
 import cv2
 from ..sqlHelper import resource_root
 
 rss_subscriptions = [["biliDynamic","404145357"],# Arcaea BiliDynamic\
+					# ["biliDynamic","481648327"],# MaimaiCN Official\
+					["biliDynamic","552507635"],# MaimaiJP Repost\
 					# ["fgoNews",""],# FGO JP NEWS\
 					]
 
