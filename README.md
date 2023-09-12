@@ -13,7 +13,7 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
   <summary>主要功能 Main Features</summary>
 
 - **Arcaea相关**: 查询歌曲信息，查询谱面信息，查询别名，获取指定定数所有曲目，定数表，随机曲目
-- **maimaiDX相关**: 查询歌曲&谱面信息，查询别名，best50图片生成
+- **maimaiDX相关**: 查询歌曲&谱面信息，查询别名，best50图片生成，随机曲目，新歌列表
 - **pjsk相关**: 查询当前活动信息，查询个人FC/AP数据，查询皆传进度，查询别名
   
 </details>
@@ -31,7 +31,11 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 
 <details>
   <summary>点我展开 Click To Expand</summary>
-
+- 2023.9.11
+  - 增加rss推送功能
+  - 新增randmai函数 随机抽取maimai歌曲
+  - 新增mnew函数 显示当前maimai版本所有歌曲
+  - 修复拍一拍相关
 - 2023.08.20
   - 适配wxAPI更新，wx版本更新至至3.9.2.23
 </details>
