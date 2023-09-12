@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-import websocket,time,json,requests,os,rel,sqlite3,brotli
+import websocket,time,json,requests,os,rel,sqlite3,brotli,subprocess
 import random,string,traceback
 from datetime import datetime
 from pytz import timezone
@@ -11,6 +11,7 @@ from Functions.gosenchoyen.generator import genImage
 from Functions.arcaea.arcaea import *
 from Functions.pjsk.pjsk import *
 from Functions.maiCN.maimaiDX import *
+from Functions.rss.rssPush import *
 
 websocket._logging._logger.level = -99
 init(autoreset = True)
@@ -97,8 +98,11 @@ query ($id: Int, $idMal:Int, $search: String) {
 '''Initialize Autohibernate'''
 undisturbed_hb = 0
 
+'''Initialize TickScheduler'''
+global_event_tick = 0
+
 '''Admins'''
-OP_list = ['wxid_xd4gc9mu3stx12']
+OP_LIST = ['wxid_xd4gc9mu3stx12']
 
 '''Local Resource Path'''
 project_path = os.path.join(os.path.dirname(__file__))
@@ -140,7 +144,8 @@ def output(msg,logtype = 'SYSTEM',mode = 'DEFAULT',background = 'DEFAULT'):
 		'CALL' : '031',
 		'WARNING': '031',
 		'CREATE_LINK':'032',
-		'STOP_LINK':'031'
+		'STOP_LINK':'031',
+		'RSS': '037'
 	}
 	LogMode = {
 		'DEFAULT': '0',
@@ -154,14 +159,19 @@ def output(msg,logtype = 'SYSTEM',mode = 'DEFAULT',background = 'DEFAULT'):
 		'BLUE' : ';44',
 		'WHITE' : ';47',
 		'GREEN' : ';42',
-		'MINT' : ';46'
+		'MINT' : ';46',
+		'PURPLE' : ';45'
 	}
 	color = LogColor.get(logtype)
 	mode = LogMode.get(mode)
 	bg = LogBG.get(background)
 
-
 	now=time.strftime("%Y-%m-%d %X")
+
+	# Shorten logs of too long messages
+	if repr(msg).count('\n') > 7 and logtype != 'ERROR':
+		msg = "\n".join(msg.split("\n")[:5])
+		msg += '\n......'
 	print(f"[{now} \033[{mode};{color}{bg}m{logtype}\033[0m] {msg}")
 
 	# Write Error Logs on to Local File
@@ -450,24 +460,30 @@ def handle_wxuser_list(j):
 
 ################################# INITIALIZE ###############################
 def heartbeat(msgJson):
-	global undisturbed_hb
+	global undisturbed_hb, global_event_tick
 	undisturbed_hb += 1
+	global_event_tick += 1
+
+	# Local Log of Heartbeat
 	if undisturbed_hb < 5:
 		output('Success','HEART_BEAT','HIGHLIGHT')
 	elif undisturbed_hb == 5:
 		output('Undisturbed in 5 min. Hiding heartbeat logs. zZZ',logtype = 'HEART_BEAT',mode = 'HIGHLIGHT')
 
-	# print("["+f"\033[1;35m{LogType}\033[0m"+"] "+' Success')
+	# Every 10 min, Trigger a rss fetch
+	if global_event_tick % 10 == 0 and global_event_tick != 0:
+		tRss = Thread(target=rss_trigger,args = ())
+		global_event_tick = 0
+		tRss.start()
 
 def on_open(ws):
 	#初始化
 	ws.send(send_wxuser_list())
-	for wxid in OP_list:
+	for wxid in OP_LIST:
 		sql_update(conn,'Users','powerLevel',3,f"wxid = '{wxid}'")
 
 	now=time.strftime("%Y-%m-%d %X")
-	ws.send(send_msg(f'启动完成\n{now}',OP_list[0]))
-	# ws.send(get_chatroom_memberlist())
+	ws.send(send_txt_msg(f'启动完成\n{now}',OP_LIST[0]))
 
 def on_error(ws,error):
 	output(f'on_error:{error}','ERROR','HIGHLIGHT','RED')
@@ -482,20 +498,6 @@ def sql_initialize_group(roomid):
 	# print(initialize_users)
 	conn.execute(initialize_group)
 	conn.commit()
-
-def sql_initialize_link(linkroomid,allselect):
-	initialize_link = f'''CREATE TABLE IF NOT EXISTS {linkroomid}
-			(wxid TEXT,
-			arcID NUMBER,
-			allselect NUMBER NOT NULL DEFAULT {allselect},
-			songselect NUMBER NOT NULL DEFAULT 0,
-			song TEXT NOT NULL DEFAULT -1,
-			songStarted NUMBER NOT NULL DEFAULT -1,
-			isOwner NUMBER NOT NULL DEFAULT 0);'''
-	# output(initialize_link)
-	conn.execute(initialize_link)
-	conn.commit()
-	output(f'Created Link Play Room of ID {linkroomid}','CREATE_LINK',background = 'WHITE')
 
 def sql_initialize_users():
 	initialize_users = f'''CREATE TABLE IF NOT EXISTS Users
@@ -531,7 +533,7 @@ def destroy_all():
 	}
 	return json.dumps(qs)
 
-def send_msg(msg,wxid='null'):
+def send_txt_msg(msg,wxid='null'):
 	if msg.endswith('.png'):
 		msg_type=PIC_MSG
 	else:
@@ -580,8 +582,6 @@ def send_pic(filepath,wxid = 'null'):
 def handle_status_msg(msgJson):
 	# output(f'收到消息:{msgJson}')
 	if '拍了拍我' in msgJson['content']['content']:
-		# output(msgJson
-
 		output(f"{msgJson['content']['content']}",'PAT',background = 'MINT')
 
 		wxid = msgJson['content']['id1']
@@ -597,35 +597,35 @@ def handle_status_msg(msgJson):
 
 		sql_update(conn,'Users','patTimes',new_pat_times,f"wxid = '{wxid}'")
 
-		ws.send(send_msg(f'第{new_pat_times}次了！',msgJson['content']['id1']))
+		ws.send(send_txt_msg(f'第{new_pat_times}次了！',msgJson['content']['id1']))
 
-	if '邀请' in msgJson['content']['content']:
+	elif '邀请' in msgJson['content']['content']:
 		ws.send(send_wxuser_list())
 		roomid=msgJson['content']['id1']
 		# nickname=msgJson['content']['content'].split('"')[-2]
-		ws.send(send_msg(f'欢迎进群',wxid=roomid))
+		ws.send(send_txt_msg(f'欢迎进群',wxid=roomid))
 
 def handle_sent_msg(msgJson):
 	output(msgJson['content'],mode = 'HIGHLIGHT')
 
-def handle_cite_msg(msgJson):
+def handle_xml_msg(msgJson):
 	# 处理带引用的文字消息和转发链接
 	msgXml=msgJson['content']['content'].replace('&amp;','&').replace('&lt;','<').replace('&gt;','>')
 	soup=BeautifulSoup(msgXml,features="xml")
+
 	if soup.appname.string == '哔哩哔哩':
-		output(f'Video from BiliBili: {soup.title.string} URL: {soup.url.string}')
+		output(f'Video from BiliBili: {soup.title.string} URL: {soup.url.string}',logtype = 'GROUPCHAT')
 		return
-	# print(soup.prettify())
-	refmsg = [child for child in soup.refermsg.strings if child != '\n']
-	# output(refmsg)
+
+	refmsg = soup.refermsg
 
 	msgJson={
 		'content':soup.select_one('title').text,
-		'refcontent': refmsg[5],
-		'refnick': refmsg[4],
+		'refcontent': refmsg.select_one('content').text,
+		'refnick': refmsg.select_one('displayname').text,
 		'id':msgJson['id'],
 		'id1':msgJson['content']['id2'],
-		'id2': refmsg[2],
+		'id2': refmsg.select_one('chatusr').text,
 		'id3':'',
 		'srvid':msgJson['srvid'],
 		'time':msgJson['time'],
@@ -636,6 +636,7 @@ def handle_cite_msg(msgJson):
 
 def handle_at_msg(msgJson):
 	output(msgJson)
+	output('AT_msg')
 
 def handle_recv_pic(msgJson):
 	msgJson = msgJson['content']
@@ -676,6 +677,8 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'bind': bindID,
 		'patstat': patstat,
 		'gosen': gen_5000,
+		'fdbk': feedback,
+
 		'ban': ban,
 		'unban':unban,
 		'refresh': refresh,
@@ -685,12 +688,14 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'announce': announce,
 		'annswitch': switch_announce,
 		'annview': view_announce,
+		'rssswitch': switch_rss,
+		'rssview': view_rss,
+
 		'logs': fetch_logs,
 
 		'ainfo': arc_music_search,
 		'randarc': arc_random,
 		'acinfo': arc_chart_info,
-		'alookup': arc_lookup,
 		'awhat': arc_alias_search,
 		'grablevel': grablevel,
 		'constable': constable,
@@ -698,11 +703,15 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 
 		'minfo': mai_music_search,
 		'mwhat':mai_alias_search,
+		'mnew': mai_music_new,
+		'randmai': mai_music_random,
 		'mupdate': mai_update,
 
 		'pjskpf': pjskpf,
 		'pwhat': pjsk_alias_search,
+		'pinfo': pjsk_music_search,
 		'amikaiden': amIkaiden,
+		'pupdate': pjsk_data_update
 	}
 	'''
 	Terminal Log
@@ -716,75 +725,84 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	Call individual function
 	'''
 	real_data = call_data[1:]
-	send_function = send_msg
+	send_function = send_txt_msg
+	func_name = call_data[0].lower()
 
 	# Best XX Function runs on a seperate thread
 	# Depreciated as Arcaea API limit
-	if call_data[0][0].lower() == 'b' and call_data[0][1:].isdigit():
-		ws.send(send_msg('Arcaea分数相关功能因Estertion查分器下线原因暂停使用。',destination))
+	if func_name[0] == 'b' and func_name[1:].isdigit():
+		ws.send(send_txt_msg('Arcaea分数相关功能因Estertion查分器下线原因暂停使用。',destination))
 		return
 
 	# Arc Recent Depreciated
-	elif call_data[0].lower() == 'arcrecent':
-		ws.send(send_msg('Arcaea分数相关功能因Estertion查分器下线原因暂停使用。',destination))
+	elif func_name == 'arcrecent':
+		ws.send(send_txt_msg('Arcaea分数相关功能因Estertion查分器下线原因暂停使用。',destination))
 		return
 
 	# MAIMAI Best 40 is Depreciated
-	elif call_data[0].lower() == 'mb40':
-		ws.send(send_msg('请移步maimai b50。\n指令: mb50',destination))
+	elif func_name == 'mb40':
+		ws.send(send_txt_msg('请移步maimai b50。\n指令: mb50',destination))
 		return
 
 	# MAIMAI Best 50 runs on a seperate thread
-	elif call_data[0].lower() == 'mb50':
+	elif func_name == 'mb50':
 		real_data = call_data[1:]
 		# if a player name is given
 		if real_data:
 			real_data.insert(0,True)
 		else:
 			real_data = [True]
-		ws.send(send_msg('正在获取',destination))
-		tmb40 = Thread(target=mai_best,args = (real_data,callerid,destination))
-		tmb40.start()
+		ws.send(send_txt_msg('正在获取',destination))
+		tmb50 = Thread(target=mai_best,args = (real_data,callerid,destination))
+		tmb50.start()
 		return
 
 	# Project Sekai Event fetch runs on a seperate thread
-	elif call_data[0].lower() == 'pjskev':
+	elif func_name == 'pjskev':
 		tpjsk = Thread(target = pjsk_curr_event,args = (real_data,callerid,destination))
 		tpjsk.start()
 		return
 
 	# anime tracing runs on a seperate thread
-	elif call_data[0].lower() == 'whatanime':
+	elif func_name == 'whatanime':
 		tani = Thread(target = anime_by_url,args = (real_data,callerid,destination))
 		tani.start()
 		return
 
-	elif call_data[0].lower() == 'help':
+	elif func_name == 'help':
 		ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',destination))
 		return
 
-	if call_data[0].lower() not in functions.keys():
+	elif func_name == 'cmd':
+		tcmd = Thread(target = execute_cmd,args = (real_data,callerid,destination))
+		tcmd.start()
+		return
+
+	if func_name not in functions.keys():
 		output('Called non-existent function','WARNING',background = 'WHITE')
-		ws.send(send_msg('没有该指令。',destination))
+		ws.send(send_txt_msg(f'没有该指令: {func_name}',destination))
 		return
 
 	try:
-		ansList = functions.get(call_data[0].lower())(real_data,callerid,destination)
-		ws.send(send_function(ansList[0],destination))
-
+		ansList = functions.get(func_name)(real_data,callerid,destination)
+	# Error Happened. Push Error Msg to destination
 	except Exception as e:
-		output(traceback.print_exc())
 		output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
-		ws.send(send_msg('出错了＿|￣|○\n请尝试检查指令参数，调用help或把WDS@出来',destination))
+		ws.send(send_txt_msg(f'出错了＿|￣|○\n指令: {func_name}\n错误细节: {e}\n请尝试检查指令参数，调用help或把WDS@出来',destination))
+		output(traceback.format_exc(),'ERROR','HIGHLIGHT','RED')
+		return
+	# No Error happened in the function call
+	ws.send(send_function(ansList[0],destination))
 
 def handle_recv_msg(msgJson):
 	global undisturbed_hb
 	undisturbed_hb = 0
 	# output(msgJson)
-	# output('on recv msg OK')
 
 	isCite = False
-	if msgJson['id2']:
+	# if msg is a cite message
+	if msgJson.get('refnick',-1) != -1 and \
+		msgJson.get('refcontent',-1) != -1:
 		isCite = True
 
 	if '@chatroom' in msgJson['wxid']:
@@ -842,18 +860,21 @@ def handle_recv_msg(msgJson):
 	# elif keyword == 'linkhelp':
 		# ws.send(send_attatch(f'{resource_path}\\Help\\WindbotLinkHelp.jpg',msgJson['wxid']))
 	elif keyword=='ding':
-		ws.send(send_msg('dong',wxid=msgJson['wxid']))
+		ws.send(send_txt_msg('dong',wxid=msgJson['wxid']))
 	elif keyword=='dong':
-		ws.send(send_msg('ding',wxid=msgJson['wxid']))
+		ws.send(send_txt_msg('ding',wxid=msgJson['wxid']))
 	elif keyword == '6':
 		if roomid:
-			ws.send(send_msg('WB很不喜欢单走一个6哦',wxid=msgJson['wxid']))
-			# ban([msgJson['id1']],OP_list[0],msgJson['wxid'])
+			ws.send(send_txt_msg('WB很不喜欢单走一个6哦',wxid=msgJson['wxid']))
+			# ban([msgJson['id1']],OP_LIST[0],msgJson['wxid'])
 	elif keyword == '‎‎':
-		replies = ['‎‎','全ては一つの幸福に集约された。今日という日は人类が真の幸切った辉かしい历史の転换である','U,INVERSE']
-		ws.send(send_msg(random.choice(replies),wxid=msgJson['wxid']))
+		replies = ['‎‎','全ては一つの幸福に集约された。今日という日は人类が真の幸切った辉かしい历史の転换である','U,iNVERSE']
+		ws.send(send_txt_msg(random.choice(replies),wxid=msgJson['wxid']))
+	elif keyword == '‎':
+		replies = ['₂ₓ']
+		ws.send(send_txt_msg(random.choice(replies),wxid=msgJson['wxid']))
 	elif keyword == 'friday' or keyword == 'Friday':
-		ws.send(send_msg(today_is_friday_in_california(msgJson['wxid']),wxid = msgJson['wxid']))
+		ws.send(send_txt_msg(today_is_friday_in_california(msgJson['wxid']),wxid = msgJson['wxid']))
 
 def Q2B(uchar):
     """单个字符 全角转半角"""
@@ -874,8 +895,8 @@ def stringQ2B(ustring):
 def on_message(ws,message):
 	j=json.loads(message)
 	resp_type=j['type']
-	#output(j)
-	#output(resp_type)
+	# output(j)
+	# output(resp_type)
 
 	# switch结构
 	action={
@@ -891,7 +912,7 @@ def on_message(ws,message):
 		CHATROOM_MEMBER:handle_memberlist,
 		RECV_PIC_MSG:handle_recv_pic,
 		RECV_TXT_MSG:handle_recv_msg,
-		RECV_TXT_CITE_MSG:handle_cite_msg,
+		RECV_TXT_CITE_MSG:handle_xml_msg,
 		HEART_BEAT:heartbeat,
 		USER_LIST:handle_wxuser_list,
 		GET_USER_LIST_SUCCSESS:handle_wxuser_list,
@@ -908,34 +929,55 @@ def bindID(datalist,callerid,roomid = None):
 		'pjsk': 'pjskID',
 		'mai': 'maiID'
 	}
-	app, usrID = datalist[0],datalist[1]
-	appsqlID = bindapp.get(app)
-
-	sql_update(conn,'Users',appsqlID,usrID,f"wxid = '{callerid}'")
-
-	message = f'已绑定至 {app}ID: {usrID}'
-	return [message]
-	# ws.send(send_msg(f'已绑定至 {app}ID: {usrID}',dest))
+	if len(datalist) == 0:
+		return ['请指明需要绑定的ID类型和ID']
+	reply_txt = ''
+	if datalist[0] == 'view':
+		# Format: [(arcID,maiID,pjskID)]
+		usrInfo = sql_fetch(cur,'Users',['arcID','maiID','pjskID'],f"wxid = '{callerid}'")[0]
+		id_type = ['Arcaea','maimai查分器','pjsk']
+		unbound_cnt = 0
+		for i in range(len(usrInfo)):
+			if str(usrInfo[i]) != '-1':
+				reply_txt += f'已绑定的{id_type[i]}ID: {usrInfo[i]}\n'
+			else:
+				unbound_cnt += 1
+				reply_txt += f'您没有绑定{id_type[i]}ID\n'
+		if unbound_cnt == len(usrInfo):
+			reply_txt = '您还没有绑定任何ID。\n示例绑定: @WindBot bind mai xxxxx'
+	elif datalist[0] not in bindapp.keys():
+		reply_txt = f'没有该类型ID: {datalist[0]}'
+	else:
+		app, usrID = datalist[0],datalist[1]
+		appsqlID = bindapp.get(app)
+		sql_update(conn,'Users',appsqlID,usrID,f"wxid = '{callerid}'")
+		reply_txt = f'已绑定至 {app}ID: {usrID}'
+	return [reply_txt]
 
 def patstat(datalist,callerid,roomid = None):
-	result = sql_fetch(cur,'Users',condition = f"wxid = '{callerid}'")[0]
-	patTimes = result[3]
+	patTimes = sql_fetch(cur,'Users',['patTimes'],f"wxid = '{callerid}'")[0][0]
+
+	if patTimes > 109:
+		reply_txt = f"你总共拍了WB{patTimes}次。\n0MG"
+		return [reply_txt]
 
 	reaction = {
-		'0': '(*´-`)',
-		'1': "(( _ _ ))..zzzZZ",
-		'2': "٩( 'ω' )و",
-		'3': "٩( ᐛ )و",
-		'4': "(*^ω^*)",
-		'5': "（╹◡╹）♡",
-		'6': "♪(*^^)o∀*∀o(^^*)♪"
+		0: '(*´-`)',
+		1: "(( _ _ ))..zzzZZ",
+		2: "٩( 'ω' )و",
+		3: "٩( ᐛ )و",
+		4: "(*^ω^*)",
+		5: "（╹◡╹）♡",
+		6: "♪(*^^)o∀*∀o(^^*)♪",
+		7: "（＾Ｏ＾☆♪",
+		8: "☆彡",
+		9: "(=´∀｀)人(´∀｀=)",
+		10: "♪───Ｏ（≧∇≦）Ｏ────♪"
 	}
 
-	react = reaction[str(patTimes//10)]
-
-	message = f"你总共拍了我{patTimes}次{react}"
-	return [message,patTimes]
-	# ws.send(send_msg(f"你总共拍了我{patTimes}次{react}",dest))
+	react = reaction[patTimes//10]
+	reply_txt = f"你总共拍了我{patTimes}次{react}"
+	return [reply_txt]
 
 def today_is_friday_in_california(roomid = None):
 	california = timezone('America/Los_Angeles')
@@ -944,7 +986,7 @@ def today_is_friday_in_california(roomid = None):
 		return 'Today is Friday in California.'
 	return 'Today is not Friday in California.'
 
-def gen_5000(datalist,callerid,roomid):
+def gen_5000(datalist,callerid,roomid = None):
 	if len(datalist) == 0:
 		first_keyword = "5000兆円"
 		second_keyword = "欲しい!"
@@ -964,56 +1006,27 @@ def constable(datalist,callerid,roomid = None):
 	return ['']
 
 #-----PJSK-----
-def ongoingEvent(datalist,callerid,roomid):
-	conn = sqlite3.connect('./windbotDB.db')
-	cur = conn.cursor()
-	userid = sql_fetch(cur,'Users',['pjskID'],f"wxid = '{callerid}'")[0][0]
-	if userid == -1:
-		return ['您未绑定Project Sekai ID。请使用Bind指令绑定。']
-
-	_data = data_req(url_e_data)
-	event_id, event_name, event_end_time, e_type = load_event_info(_data)
-	url1 = f'https://api.pjsekai.moe/api/user/%7Buser_id%7D/event/{event_id}/ranking?targetUserId={userid}'
-
-	user_event_data = req.get(url1, headers=headers)
-	_event_data = json.loads(user_event_data.text)
-
-	reply_txt = f"当前活动:「{event_name}」\n活动类型: {e_type}\n关闭时间: UTC+8 {event_end_time}\n"
-	if _event_data['rankings'] == []:
-		reply_txt += "您还未参与此活动。"
-	else:
-		score = _event_data['rankings'][0]['score']
-		rank = _event_data['rankings'][0]['rank']
-		reply_txt += f"您的分数为{score}pt, 处于榜上第{rank}位。"
-		nearest_line = -1
-		event_line = [100, 200, 500,
-					1000, 2000, 5000,
-					10000, 20000, 50000,
-					100000, 200000, 500000,
-					1000000, 2000000, 5000000]
-		for a in event_line:
-			if a < rank:
-				nearest_line = a
-			elif event_line[-1] < rank:
-				nearest_line = event_line[-1]
-
-		try:
-			url2 = f'https://api.pjsekai.moe/api/user/%7Buser_id%7D/event/{event_id}/ranking?targetRank={nearest_line}'
-
-			event_line_data = req.get(url2, headers=headers)
-			_event_line_data = json.loads(event_line_data.text)
-			# output(event_line_data)
-
-			reply_txt += f"\n最近分数线: rank#{nearest_line} {str(_event_line_data['rankings'][0]['score'])}pt"
-		except:
-			reply_txt += f"\n最近分数线: rank#{nearest_line} 暂无数据"
-
-	ws.send(send_msg(reply_txt,roomid))
+def pjsk_curr_event(datalist,callerid,roomid = None):
+    event_type_dict = {
+        '普活': 'marathon', '马拉松': 'marathon', 'marathon': 'marathon',
+        '5v5': 'cheerful_carnival', '嘉年华': 'cheerful_carnival', 'cheerful_carnival': 'cheerful_carnival'
+    }
+    event_type_dict = {'marathon': '普活','cheerful_carnival': '5v5嘉年华'}
+    unit_dict = {
+        'light_sound': 'Leo/need', 'idol': 'More More Jump', \
+        'street': 'Vivid Bad Squad','theme_park': 'Wonderlands x Showtime',\
+        'school_refusal': '25时', 'none': '未指明不知道是哪个团但是感觉会很开心的'
+    }
+    data , resp= pjsk_event_get(local = False)
+    event = load_event_info(data)
+    end_text = '(进行中)' if event[-1] else '(已结束)'
+    reply_txt = f'{unit_dict[event[4]]}活动！\n「{event[1]}」\n类型: {event_type_dict[event[3]]}\n结束时间: {event[2]} {end_text}'
+    ws.send(send_txt_msg(reply_txt,roomid))
 
 #-----ANIME-----
 def anime_by_url(datalist,callerid,roomid):
 		if len(datalist) == 0:
-				ws.send(send_msg("请提供URL。",roomid))
+				ws.send(send_txt_msg("请提供URL。",roomid))
 				return
 		url = datalist[0]
 		API_URL ='https://api.trace.moe/search?cutBorders&url=' + url
@@ -1049,7 +1062,7 @@ def anime_by_url(datalist,callerid,roomid):
 				for chunk in downloader.iter_content(chunk_size = 1024*1024):
 					if chunk:
 					  f.write(chunk)
-		ws.send(send_msg(reply_txt,roomid))
+		ws.send(send_txt_msg(reply_txt,roomid))
 		ws.send(send_pic(f"{resource_path}\\WhatAnime\\result.mp4",roomid))
 		#output("SENT VIDEO")
 
@@ -1067,26 +1080,68 @@ def mai_best(datalist,callerid,roomid = None):
 	else:
 		gamertag = sql_fetch(cur_thread,'Users',['maiID'],f"wxid = '{callerid}'")[0][0]
 		if gamertag == '-1':
-			ws.send(send_msg('您未绑定maimai查分器ID。请使用Bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。',roomid))
+			ws.send(send_txt_msg('您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: @WindBot bind mai xxxxx',roomid))
 			return
 
 	b50 = datalist[0]
 	image = draw_best_image(gamertag,b50)
 
 	if image == -2:
-		ws.send(send_msg('该用户选择不公开数据。',roomid))
+		ws.send(send_txt_msg('该用户选择不公开数据。',roomid))
 		return
 	elif image == -1:
-		ws.send(send_msg(f'请检查您绑定的查分器用户ID。目前绑定: {gamertag}',roomid))
+		ws.send(send_txt_msg(f'查分器没有返回数据,请检查您绑定的查分器用户ID。目前绑定: {gamertag}\n如果您没有导入过游玩数据,请参考https://www.diving-fish.com/maimaidx/prober_guide。',roomid))
 		return
 	elif image == 0:
-		ws.send(send_msg('发生未知错误。',roomid))
+		ws.send(send_txt_msg('发生未知错误。',roomid))
 		return
 
-	store_path = os.path.join(resource_path,'MaiBest')
+	store_path = os.path.join(os.path.join(resource_path,'maiCN'),'MaiBest')
 	image = image.save(os.path.join(store_path,f'{gamertag}.png'))
-
 	ws.send(send_attatch(os.path.join(store_path,f'{gamertag}.png'),roomid))
+
+#-----RSS-----
+def rss_trigger():
+	pushed = False
+	for subscribed in rss_subscriptions:
+		# Format: check_rss(route,usrID)
+		to_push = check_rss(*subscribed)
+
+		# Has new feed
+		if to_push != -1:
+			pushed = True
+			for feed in to_push:
+				final_feed = finalize_feed(*feed)
+				rss_push(final_feed)
+	if pushed:
+		output('Pushed New Feed',logtype = 'RSS',background = 'PURPLE')
+	else:
+		output('No New Feed',logtype = 'RSS',background = 'PURPLE')
+
+def rss_push(feed):
+	conn_thread = sqlite3.connect('./windbotDB.db')
+	cur_thread = conn_thread.cursor()
+	groups = sql_fetch(cur,'Groupchats',['*'],"rssPush = 1")
+	if len(groups) == 0:
+		ws.send(send_txt_msg('目前没有群聊开启rss推送',OP_LIST[0]))
+	else:
+		feed_content = f"""{feed[0][3]}@{feed[0][1]}:\n{feed[0][0]}\
+							\nLink: {feed[0][2]}"""
+
+		content = f'[rss推送]\n{feed_content}'
+		op_fdbk_txt = f"内容:{content}\n已向以下群聊推送rss消息:\n"
+
+		for g in groups:
+			group_id = f"{g[0]}@chatroom"
+			# Send text feed
+			ws.send(send_txt_msg(content,group_id))
+			# If the feed contain images
+			if len(feed) > 1:
+				ws.send(send_attatch(feed[1],group_id))
+			# Record group in feedback
+			op_fdbk_txt += f"{g[1]}({g[0]})\n"
+		# Feedback
+		ws.send(send_txt_msg(op_fdbk_txt,OP_LIST[0]))
 
 ########################## MANAGING FUNCTIONS ##############################
 def ban(datalist,callerid,roomid):
@@ -1110,8 +1165,8 @@ def ban(datalist,callerid,roomid):
 			except Exception as e:
 				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
 				continue
-		if wxid in OP_list:
-			ws.send(send_msg('不建议ban了WDS捏',roomid))
+		if wxid in OP_LIST:
+			ws.send(send_txt_msg('已跳过管理员',roomid))
 			continue
 		cnt += 1
 		# output(wxid)
@@ -1120,9 +1175,7 @@ def ban(datalist,callerid,roomid):
 	return[f'应Ban{len(datalist)}人,实Ban{cnt}人,下班']
 
 def unban(datalist,callerid,roomid):
-	# output(datalist)
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
-	# output(caller_level)
 
 	if caller_level[0][0] < 2:
 		return ['您的权限不足。']
@@ -1171,7 +1224,7 @@ def setadmin(datalist,callerid,roomid = None):
 		if wxid[:4] != 'wxid':
 			try:
 				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
-				if wxid in OP_list:
+				if wxid in OP_LIST:
 					continue
 			except Exception as e:
 				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
@@ -1201,8 +1254,8 @@ def punch(datalist,callerid,roomid = None):
 			except Exception as e:
 				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
 				continue
-		if wxid in OP_list:
-			ws.send(send_msg('不建议取消WDS的权限捏',roomid))
+		if wxid in OP_LIST:
+			ws.send(send_txt_msg('已跳过WDS',roomid))
 			continue
 		# output(wxid)
 		cnt+=1
@@ -1211,7 +1264,7 @@ def punch(datalist,callerid,roomid = None):
 	return[f'应取消{len(datalist)}人,实取消{cnt}人,下班']
 
 def setsuper(datalist,callerid,roomid = None):
-	ws.send(send_msg('NEVER GONNA GIVE YOU UP\nBUT I AM GONNA LET YOU DOWN\nSAY GOODBYE',roomid))
+	ws.send(send_txt_msg('NEVER GONNA GIVE YOU UP\nBUT I AM GONNA LET YOU DOWN\nSAY GOODBYE',roomid))
 	ban([callerid],'wxid_xd4gc9mu3stx12',roomid)
 	punch([callerid],'wxid_xd4gc9mu3stx12',roomid)
 	return['']
@@ -1236,15 +1289,15 @@ def announce(datalist,callerid,roomid = None):
 		return ['您的权限不足。']
 	groups = sql_fetch(cur,'Groupchats',['*'],"announce = 1")
 	if len(groups) == 0:
-		return ['目前没有群聊开启消息推送']
+		return ['目前没有群聊开启公告推送']
 
 	content = '[推送公告]\n'
 	for w in datalist:
 		content += w + ' '
 
-	reply_txt = f"内容:{content}\n已向以下群聊推送消息:\n"
+	reply_txt = f"内容:{content}\n已向以下群聊推送公告:\n"
 	for g in groups:
-		ws.send(send_msg(content,g[0]+'@chatroom'))
+		ws.send(send_txt_msg(content,g[0]+'@chatroom'))
 		reply_txt += f"{g[1]}({g[0]})\n"
 	return [reply_txt]
 
@@ -1276,18 +1329,94 @@ def view_announce(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 	if caller_level[0][0] < 3:
 		return ['您的权限不足。']
-	reply_txt = '群组推送情况:\n'
+	reply_txt = '群组公告推送情况:\n'
 	announce_status = sql_fetch(cur,'Groupchats',['*'])
 	for group in announce_status:
 		reply_txt += f'{group[1]} ({group[0]}): {bool(group[2])}\n'
 	return [reply_txt]
+
+def switch_rss(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	if caller_level[0][0] < 3:
+		return ['您的权限不足。']
+
+	if '@chatroom' not in roomid:
+		if len(datalist) == 0:
+			return ['请提供群组ID。']
+		elif not datalist[0].isnumeric():
+			return ['请提供纯数字的群组ID。']
+		roomid = int(datalist[0])
+	else:
+		roomid = roomid[:-9]
+
+	rss_status = sql_fetch(cur,'Groupchats',['rssPush'],f"roomid = '{roomid}'")
+	if len(rss_status) == 0:
+		return [f'群组ID{roomid}不存在']
+
+	ann = (rss_status[0][0] + 1) % 2
+	sql_update(conn,'Groupchats','rssPush',ann,f"roomid = '{roomid}'")
+
+	reply_txt = f'群组rss推送:{bool(ann)}'
+	return [reply_txt]
+
+def view_rss(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	if caller_level[0][0] < 3:
+		return ['您的权限不足。']
+	reply_txt = '群组rss推送情况:\n'
+	rss_status = sql_fetch(cur,'Groupchats',['*'])
+	for group in rss_status:
+		reply_txt += f'{group[1]} ({group[0]}): {bool(group[3])}\n'
+	return [reply_txt]
+
+def execute_cmd(datalist,callerid,roomid = None):
+	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
+	cur = conn.cursor()
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	if caller_level[0][0] < 3:
+		ws.send(send_txt_msg('您的权限不足。',roomid))
+		return
+	timeout_s = 10
+	try:
+		shell = subprocess.Popen(datalist,stdout=subprocess.PIPE,\
+				stderr=subprocess.PIPE, text=True, shell = True)
+		shell.wait()
+	except subprocess.TimeoutExpired:
+		ws.send(send_txt_msg(f'Timeout for {datalist} ({timeout_s}s) expired',roomid))
+		return
+	shell_res, shell_err = shell.communicate()
+	shell.kill()
+	if shell_res == '':
+		ws.send(send_txt_msg(shell_err,roomid))
+		return
+	ws.send(send_txt_msg(shell_res,roomid))
+
+def feedback(datalist,callerid,roomid = None):
+	if len(datalist) == 0:
+		return ['请提供反馈内容']
+	else:
+		msg = ''
+		if roomid:
+			roomname = sql_fetch(cur,'Groupchats',['groupname'],\
+								f'roomid = {roomid[:-9]}')[0][0]
+			nickname = sql_fetch(cur,f'r{roomid[:-9]}',['groupUsrName'],\
+								f"wxid = '{callerid}'")[0][0]
+			msg += f"来自{roomname}-{nickname}({callerid})的反馈:\n"
+		else:
+			nickname = sql_fetch(cur,'Users',['realUsrName'],\
+								f"wxid = '{callerid}'")[0][0]
+			msg += f"来自{nickname}({callerid})的DM反馈:\n"
+		msg += " ".join(datalist)
+		handler = OP_LIST[0]
+		ws.send(send_txt_msg(msg,handler))
+		return ['发送完成']
 
 ################################ MAIN #######################################
 if __name__ == "__main__":
 	''' Initialize SQL'''
 	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
 	cur = conn.cursor()
-	# conn.execute('''ALTER TABLE Groupchats ADD COLUMN announce BOOL NOT NULL DEFAULT 0''')
+	# conn.execute('''ALTER TABLE Groupchats ADD COLUMN rssPush BOOL NOT NULL DEFAULT 0''')
 	sql_initialize_users()
 	sql_initialize_groupnames()	
 
