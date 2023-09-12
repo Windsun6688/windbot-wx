@@ -1,26 +1,6 @@
 import websocket,brotli,json,random
 from ..sqlHelper import *
 
-def arc_lookup(datalist,callerid,roomid = None):
-    nickname = datalist[0]
-    # output(datalist)
-
-    wsarc = websocket.create_connection("wss://arc.estertion.win:616/")
-    wsarc.send("lookup " + nickname)
-    buffer = ""
-    while buffer != "bye":
-        buffer = wsarc.recv()
-        if type(buffer) == type(b''):
-            obj = json.loads(str(brotli.decompress(buffer), encoding='utf-8'))
-            # output(obj)
-            rating = obj['data'][0]['rating'] / 100
-            playerid = obj['data'][0]['code']
-            # output(obj)
-
-    message = f'{nickname}的好友码是{playerid},上一次在esterion网站查分时PTT是%.2f。' % rating
-    return [message,playerid]
-    # ws.send(send_msg(f'{nickname}的好友码是{playerid}，PTT是%.2f。' % rating,dest))
-
 def arc_alias_search(datalist,callerid,roomid = None):
     result = sql_fetch(arcur,'alias',['sid'],f"alias = '{datalist[0]}'")
     res_len = len(result)
@@ -31,7 +11,7 @@ def arc_alias_search(datalist,callerid,roomid = None):
 
     for sid in result:
         sid = sid[0]
-        song_detail = sql_fetch(arcur,'charts',condition = f"song_id = '{sid}'")
+        song_detail = sql_fetch(arcur,'charts',condition=f"song_id = '{sid}'")
         # output(song_detail)
 
         level = song_detail[0]
@@ -81,19 +61,17 @@ def arc_chart_info(datalist,callerid,roomid = None):
     keyword = ''
     for word in datalist:
         keyword += (word + ' ')
-
     keyword = keyword.strip()
 
-    res = sql_match(arcdb,arcur,'charts',['song_id'],'name_en',f'{keyword}')
+    res = sql_fetch(arcur,'charts',['song_id'],f"song_id = '\"{keyword}\"'")
     if len(res) == 0:
-        res = sql_fetch(arcur,'charts',['song_id'],f"song_id = '{keyword}'")
+        res = sql_match(arcdb,arcur,'alias',['sid'],'alias',f'\"{keyword}\"')
         if len(res)== 0:
-            res = sql_match(arcdb,arcur,'alias',['sid'],'alias',f'{keyword}')
+            res = sql_match(arcdb,arcur,'charts',['song_id'],'name_en',f'\"{keyword}\"')
             if len(res) == 0:
                 return ['没有找到相关歌曲 私密马赛']
     reply_txt = ''
     sid = res[0][0]
-
     if sid == 'lasteternity':
         return ['onoken - Last | Eternity\nBYD 9.7 | Notes: 790 | Charter: Arcaea']
 
@@ -150,6 +128,11 @@ def arc_music_search(datalist,callerid,roomid = None):
     # Remove Duplicate Results
     sids = list(set([s[0] for s in result]))
 
+    # Handle the special case of 'Last' and 'Last|Eternity'
+    for s in sids:
+        if s == 'lasteternity':
+            sids.remove(s)
+
     if len(sids)>5:
         return['过多结果。请优化搜索词。']
 
@@ -158,8 +141,9 @@ def arc_music_search(datalist,callerid,roomid = None):
     for sid in sids:
         last_append = False
         song_detail = sql_fetch(arcur,'charts',condition = f"song_id = '{sid}'")
+
         # Handle the special case of 'Last' and 'Last|Eternity'
-        if sid == 'lasteternity' or sid == 'last':
+        if sid == 'last':
             song_detail = sql_fetch(arcur,'charts',condition = "song_id = 'last'")
             last_append = True
 
@@ -368,5 +352,3 @@ def arc_random(datalist,callerid,roomid):
         reply_txt = reply_txt.replace("ARTIST",f'{artist}')
 
     return [reply_txt]
-
-
