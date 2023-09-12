@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from io import BytesIO
 from ..sqlHelper import *
 
-static = os.path.join(os.path.dirname(__file__),'resource')
+static = os.path.join(resource_root,'maiCN')
 material = os.path.join(static,'material')
 
 scoreRank = ['d', 'c', 'b', 'bb', 'bbb', 'a', 'aa', 'aaa', 's', 's+', 'ss', 'ss+', 'sss', 'sss+']
@@ -180,9 +180,41 @@ def mai_music_by_title(title: str):
             return s
     return -1
 
-def mai_music_random():
-    songs = mai_music_get(True)[0]
-    return random.choice(songs)
+def mai_music_by_alias(alias: str):
+    pass
+
+def mai_music_random(datalist,callerid,roomid = None):
+    # If no diff specified, random over the whole collection
+    if len(datalist) == 0:
+        songs = mai_music_get(True)[0]
+    # If a number of diffs are specified
+    else:
+        collection = mai_music_get(True)[0]
+        songs = []
+        for s in collection:
+            for diff in s['level']:
+                if diff in datalist:
+                    songs.append(s)
+        if len(songs) == 0:
+            return['没有找到在这些难度的歌曲。']
+
+    choice = random.choice(songs)
+    reply_txt = "WB为你随机抽取了以下歌曲:\n"
+    reply_txt += f"{choice['title']} (id: {choice['id']})"
+    return [reply_txt]
+
+def mai_music_new(datalist,callerid,roomid = None):
+    songs = mai_music_get(local = False)[0]
+    reply_txt = "当前CN最新版本歌曲列表:\n"
+    has_new = False
+    for s in songs:
+        if s['basic_info']['is_new']:
+            has_new = True
+            reply_txt += f"{s['title']} (id: {s['id']})\n"
+    if has_new:
+        return [reply_txt]
+    else:
+        return ['当前还没有新歌。']
 
 def mai_alias_get(type: str = 'all',params: dict = None, local: bool = False):
     """
@@ -253,7 +285,7 @@ def mai_update(datalist,callerid,roomid = None):
         resp += "别名:ok"
     return [resp]
 
-#### Best Image Drawing ####
+######## Best Image Drawing ########
 def image_to_base64(img: Image.Image, format='PNG') -> str:
     output_buffer = BytesIO()
     img.save(output_buffer, format)
