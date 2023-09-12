@@ -1,7 +1,7 @@
 import json,os,requests,base64,random,math
-from rapidfuzz import fuzz, utils
+from rapidfuzz import fuzz
 from PIL import Image, ImageDraw, ImageFont
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 from io import BytesIO
 from ..sqlHelper import *
 
@@ -31,8 +31,8 @@ ALIAS = {
     'end': 'GetAliasEnd'
 }
 
-def mai_api_get(gamertag: str, b50: bool = False,type: str = 'player'):
-    url = f'https://www.diving-fish.com/api/maimaidxprober/query/{type}'
+def mai_api_get(gamertag: str, b50: bool = False,mode: str = 'player'):
+    url = f'https://www.diving-fish.com/api/maimaidxprober/query/{mode}'
     j = {
         'username': gamertag,
     }
@@ -104,7 +104,7 @@ def mai_music_get(local: bool = False):
 
 def mai_music_search(datalist,callerid,roomid = None):
     # 载入数据
-    mai_songs,mai_charts = mai_music_get(local = True)
+    mai_songs = mai_music_get(local = True)[0]
 
     results = []
     # Fuzzy text search
@@ -216,7 +216,7 @@ def mai_music_new(datalist,callerid,roomid = None):
     else:
         return ['当前还没有新歌。']
 
-def mai_alias_get(type: str = 'all',params: dict = None, local: bool = False):
+def mai_alias_get(mode: str = 'all',params: dict = None, local: bool = False):
     """
     - `all`: 所有曲目的别名
     - `songs`: 该别名的曲目
@@ -230,7 +230,7 @@ def mai_alias_get(type: str = 'all',params: dict = None, local: bool = False):
         return data
 
     try:
-        resp = requests.get(f'https://api.yuzuai.xyz/maimaidx/{ALIAS[type]}',params = params)
+        resp = requests.get(f'https://api.yuzuai.xyz/maimaidx/{ALIAS[mode]}',params = params)
 
         if resp.status_code != 200:
             output('maimaiDX歌曲别名数据获取失败,切换为本地暂存文件','WARNING',background = 'WHITE')
@@ -286,9 +286,9 @@ def mai_update(datalist,callerid,roomid = None):
     return [resp]
 
 ######## Best Image Drawing ########
-def image_to_base64(img: Image.Image, format='PNG') -> str:
+def image_to_base64(img: Image.Image, fileFormat='PNG') -> str:
     output_buffer = BytesIO()
-    img.save(output_buffer, format)
+    img.save(output_buffer, fileFormat)
     byte_data = output_buffer.getvalue()
     base64_str = base64.b64encode(byte_data).decode()
     return 'base64://' + base64_str
@@ -383,12 +383,12 @@ def _columnWidth(s: str) -> int:
         res += _getCharWidth(ord(ch))
     return res
 
-def _changeColumnWidth(s: str, len: int) -> str:
+def _changeColumnWidth(s: str, length: int) -> str:
     res = 0
     sList = []
     for ch in s:
         res += _getCharWidth(ord(ch))
-        if res <= len:
+        if res <= length:
             sList.append(ch)
     return ''.join(sList)
 
@@ -503,10 +503,10 @@ def get_cover_len4_id(mid: str) -> str:
 
     return f'{mid:04d}'
 
-def best_2_image(output: Image.Image,data: list,type: bool):
-    # type = True 放在旧版本位置
-    # type = False 放在新版本位置
-    y = 430 if type else 1670
+def best_2_image(output: Image.Image,data: list,isOld: bool):
+    # isOld = True 放在旧版本位置
+    # isOld = False 放在新版本位置
+    y = 430 if isOld else 1670
     dy = 170
 
     # Old Color Schemes
@@ -514,10 +514,7 @@ def best_2_image(output: Image.Image,data: list,type: bool):
     # TEXT_COLOR = [(14, 117, 54, 255), (199, 69, 12, 255), (175, 0, 50, 255), (103, 20, 141, 255), (103, 20, 141, 255)]
 
     TEXT_COLOR = [(255, 255, 255, 255), (255, 255, 255, 255), (255, 255, 255, 255), (255, 255, 255, 255), (103, 20, 141, 255)]
-    DXSTAR_DEST = [0, 330, 320, 310, 300, 290]
 
-    comboPic = ['', 'FC', 'FCp', 'AP', 'APp']
-    syncPic = ['', 'FS', 'FSp', 'FSD', 'FSDp']
     cover_dir = os.path.join(material,'cover')
     mai_dir = os.path.join(material,'pic')
 
@@ -637,7 +634,6 @@ def draw_best_image(gamertag: str, b50: bool):
     siyuan = os.path.join(material, 'SourceHanSansSC-Bold.otf')
     Torus_SemiBold = os.path.join(material, 'Torus SemiBold.otf')
     nosa = os.path.join(material, 'NOSA.ttf')
-    cover_dir = os.path.join(material,'cover')
     mai_dir = os.path.join(material,'pic')
 
     # Load Assets
