@@ -21,9 +21,10 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 <details>
   <summary>其他功能 Other Features</summary>
   
-- 我想要五千兆系图片生成
-- 动画截图溯源
-- 拍一拍反馈
+  - 我想要五千兆系图片生成
+  - 动画截图溯源
+  - 拍一拍反馈
+  - RSS订阅推送
   
 </details>
 
@@ -31,13 +32,17 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 
 <details>
   <summary>点我展开 Click To Expand</summary>
-- 2023.9.11
-  - 增加rss推送功能
-  - 新增randmai函数 随机抽取maimai歌曲
-  - 新增mnew函数 显示当前maimai版本所有歌曲
-  - 修复拍一拍相关
-- 2023.08.20
-  - 适配wxAPI更新，wx版本更新至至3.9.2.23
+
+  - 2023.9.14
+    - 修复rss推送会重复推送，动态删除导致不再判断刷新的问题
+  - 2023.9.11
+    - 增加rss推送功能
+    - 新增randmai函数 随机抽取maimai歌曲
+    - 新增mnew函数 显示当前maimai版本所有歌曲
+    - 修复拍一拍相关
+  - 2023.08.20
+    - 适配wxAPI更新，wx版本更新至至3.9.2.23
+  
 </details>
 
 ## :gift_heart: 特别感谢 Thanks
