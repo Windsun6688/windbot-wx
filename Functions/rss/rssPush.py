@@ -5,6 +5,7 @@ from ..sqlHelper import resource_root
 rss_subscriptions = [["biliDynamic","404145357"],# Arcaea BiliDynamic\
 					# ["biliDynamic","481648327"],# MaimaiCN Official\
 					["biliDynamic","552507635"],# MaimaiJP Repost\
+					# ["biliDynamic","295204807"],# Test Account
 					# ["fgoNews",""],# FGO JP NEWS\
 					]
 
@@ -35,32 +36,48 @@ def check_rss(route:str,usrID:str = None):
 	# feed_data[route+usrID] = old_listjson
 	#### TESTING END ####
 
-	if listjson['rss']['channel']['item'][0]['link'] != \
-		feed_data[route+usrID]['rss']['channel']['item'][0]['link']:
-		# 先去找原来的第一个在不在新的里面
-		find = False
-		i = 0
-		for newfeed in listjson['rss']['channel']['item']:
-			# 遍历新数据
-			if newfeed['link'] == \
-				feed_data[route+usrID]['rss']['channel']['item'][0]['link']:
-					find = True
-					break
-			i += 1
+	first_feed_index = 0
+	while True:
+		# Reached Bottom of the channel
+		# *Bro deleted all posts crazy*
+		if first_feed_index == len(feed_data[route+usrID]\
+									['rss']['channel']['item']):
+			feed_data[route+usrID] = {}
+			output('BRO DELETED ALL OF HIS POSTS CRAZY LOL')
+			return -1
 
-		# 需要推送新数据
-		if find:
-			to_push = []
-			for a in range(0, i):
-				b = i - 1 - a
-				feed = listjson['rss']['channel']['item'][b]
-				to_push.append((feed,route))
-			return to_push
+		# Start from the first_feed_index
+		if listjson['rss']['channel']['item'][0]['link'] != \
+			feed_data[route+usrID]['rss']['channel']['item']\
+									[first_feed_index]['link']:
+			# 先去找原来的第一个在不在新的里面
+			found = False
+			i = 0
+			for newfeed in listjson['rss']['channel']['item']:
+				# 遍历新数据
+				if newfeed['link'] == \
+					feed_data[route+usrID]['rss']['channel']['item']\
+											[first_feed_index]['link']:
+					found = True
+					break
+				i += 1
+			# 需要推送新数据
+			if found:
+				to_push = []
+				for a in range(0, i):
+					b = i - 1 - a
+					feed = listjson['rss']['channel']['item'][b]
+					to_push.append((feed,route))
+				# Update the feed data archive
+				feed_data[route+usrID] = listjson
+				return to_push
+			# 没有找到原来的第一个
+			else:
+				# 从原来的第二个开始重新搜索
+				first_feed_index += 1
+		# 如果原来的第一个link符合新的第一个link 没有更新
 		else:
 			return -1
-	#没有新数据
-	else:
-		return -1
 
 def get_image(url:str,route:str,id:int):
 	data = requests.get(url).content
