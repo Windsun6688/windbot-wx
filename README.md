@@ -3,8 +3,8 @@
 ![](https://img.shields.io/github/commit-activity/w/Windsun6688/windbot-wx?style=for-the-badge)
 
 
-A Wechat chatbot which provides mainly rhythm-game-related features.
-提供音乐游戏相关服务的微信机器人。
+A chatbot that provides mainly rhythm-game-related features.
+提供音乐游戏相关服务的聊天软件机器人。
 > 还在开发中，写码能力不强，请见谅（
 
 ## :page_with_curl: 功能列表 Features List
