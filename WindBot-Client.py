@@ -101,7 +101,7 @@ undisturbed_hb = 0
 global_event_tick = 0
 
 '''Admins'''
-OP_LIST = ['ADMIN WXID']
+OP_LIST = ['wxid_xd4gc9mu3stx12']
 
 '''Local Resource Path'''
 project_path = os.path.join(os.path.dirname(__file__))
@@ -834,9 +834,15 @@ def handle_recv_msg(msgJson):
 		if not isCite:
 			output(f'{roomname}-{nickname}: {keyword}','GROUPCHAT')
 		else:
-			print(eval(msgJson['refcontent']))
+			# little patch that makes no sense at all
+			refcontent = msgJson['refcontent'].split("\n")
+			if len(refcontent) > 1:
+				refcontent = refcontent[4]
+			else:
+				refcontent = refcontent[0]
+
 			output(f"{roomname}-{nickname}: {keyword}\n\
-				「-> {msgJson['refnick']} : {msgJson['refcontent']}",\
+				「-> {msgJson['refnick']} : {refcontent}",\
 				'GROUPCHAT')
 	else:
 		roomid = None
