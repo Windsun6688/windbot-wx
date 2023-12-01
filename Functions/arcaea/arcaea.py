@@ -211,7 +211,9 @@ def arc_music_search(datalist,callerid,roomid = None):
 
 def grablevel(datalist,callerid,roomid = None):
     if len(datalist) < 1:
-        return ['请指明难度。']   
+        return ['请指明难度。']
+    elif not datalist[0].isnumeric():
+        return ['请指定具体定数。']
 
     diff = float(datalist[0]) * 10
     charts = sql_fetch(arcur,'charts',condition = f"rating = {diff}")
@@ -352,3 +354,6 @@ def arc_random(datalist,callerid,roomid):
         reply_txt = reply_txt.replace("ARTIST",f'{artist}')
 
     return [reply_txt]
+
+def arc_update(datalist,callerid,roomid):
+    pass
