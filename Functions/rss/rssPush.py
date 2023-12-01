@@ -1,6 +1,6 @@
 import requests,json,xmltodict,html2text,os
 import cv2
-from ..sqlHelper import resource_root
+from ..sqlHelper import resource_root,output
 
 rss_subscriptions = [["biliDynamic","404145357"],# Arcaea BiliDynamic\
 					# ["biliDynamic","481648327"],# MaimaiCN Official\
@@ -20,8 +20,15 @@ feed_data = {}
 def check_rss(route:str,usrID:str = None):
 	global feed_data
 	r = routes[route]
-	rss_reply = requests.get(hub + r + usrID)
-	listjson = xmltodict.parse(rss_reply.text)
+	try:
+		rss_reply = requests.get(hub + r + usrID)
+	except:
+		return -3
+	try:
+		listjson = xmltodict.parse(rss_reply.text)
+	# Website Blocking Access
+	except: #ExpatError wasnt picked up, idk
+		return -2
 	feed_data[route+usrID] = feed_data.get(route+usrID,{})
 
 	# First time loading from source
@@ -122,7 +129,7 @@ def finalize_feed(feed:dict,route:str):
 
 	# If there's no image, directly return the msg
 	else:
-		return ((msg,pub_time,link,author))
+		return ((msg,pub_time,link,author),None)
 
 	# If there is image,return the msg and the picture location
 	return ((msg,pub_time,link,author),pic_loc)
