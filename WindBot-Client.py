@@ -17,7 +17,6 @@ websocket._logging._logger.level = -99
 init(autoreset = True)
 
 ip='127.0.0.1'
-
 port=5555
 
 SERVER=f'ws://{ip}:{port}'
@@ -111,28 +110,11 @@ resource_path = os.path.join(os.path.dirname(__file__),'Resources')
 '''Recent Logs List'''
 latest_logs = []
 
-############################# MULTITHREADING ################################
-class ThreadWithReturnValue(Thread):
-	def __init__(self, group=None, target=None, name=None,
-				 args=(), kwargs={}, Verbose=None):
-		Thread.__init__(self, group, target, name, args, kwargs)
-		self._return = None
-
-	def run(self):
-		if self._target is not None:
-			self._return = self._target(*self._args,**self._kwargs)
-			return self._return
-
-	def join(self, *args):
-		Thread.join(self, *args)
-		return self._return
-
 ################################# OUTPUT&SQL ################################
 def getid():
 	return time.strftime("%Y%m%d%H%M%S")
 
 def output(msg,logtype = 'SYSTEM',mode = 'DEFAULT',background = 'DEFAULT'):
-	# print('got output')
 	LogColor = {
 		'SYSTEM': '034',
 		'ERROR': '037',
@@ -189,7 +171,10 @@ def output(msg,logtype = 'SYSTEM',mode = 'DEFAULT',background = 'DEFAULT'):
 	# print("["+f"{color}[1;35m{LogType}{color}[0m"+"]"+' Success')
 	# print(f'[{now}]:{msg}')
 
-def sql_insert(db,dbcur,table,rows,values):
+def sql_insert(db,dbcur,\
+			table: str,\
+			rows: list,\
+			values: list):
 	'''
 	Pre-Process
 	'''
@@ -221,7 +206,7 @@ def sql_insert(db,dbcur,table,rows,values):
 		db.execute(insert_txt)
 		db.commit()
 
-def sql_update(db,table,col,value,condition = None):
+def sql_update(db, table: str, col: str, value: str, condition: str = None):
 	# table = f'r{table[:-9]}'
 	# col = str(col).replace('\'','')
 
@@ -240,9 +225,8 @@ def sql_update(db,table,col,value,condition = None):
 	db.execute(update_txt)
 	db.commit()
 
-def sql_fetch(dbcur,table,cols = ['*'],condition = None):
+def sql_fetch(dbcur, table: str, cols: list = ['*'], condition: str = None):
 	cols = str(cols)[1:-1].replace('\'','')
-	# cols = str(cols)[1:-1]
 
 	if condition:
 		fetch_txt = f"SELECT {cols} FROM {table} WHERE {condition}"
@@ -253,7 +237,11 @@ def sql_fetch(dbcur,table,cols = ['*'],condition = None):
 	result = dbcur.fetchall()
 	return [i for i in result]
 
-def sql_match(db,dbcur,table,cols = ['*'],conditionCol = None,keyword = None):
+def sql_match(db,dbcur,\
+			table: str,\
+			cols: list = ['*'],\
+			conditionCol = None,\
+			keyword = None):
 	if not keyword:
 		return ['-1']
 	elif not conditionCol:
@@ -296,14 +284,15 @@ def sql_match(db,dbcur,table,cols = ['*'],conditionCol = None,keyword = None):
 
 	return [i for i in result]
 
-def sql_destroy(db,table):
+def sql_destroy(db,table: str):
 	destroy_txt = f"DROP TABLE {table}"
 	db.execute(destroy_txt)
 	db.commit()
 
-def sql_delete(db,table,condition = None):
+def sql_delete(db, table: str, condition: str = None):
 	if not condition:
-		output('Did not specify which delete condition.','WARNING',background = "WHITE")
+		output('Did not specify which delete condition.','WARNING',\
+				background = "WHITE")
 		return ['-1']
 
 	delete_txt = f"DELETE FROM {table} WHERE {condition}"
@@ -359,13 +348,14 @@ def get_chat_nick_p(wxid,roomid):
 	}
 	return json.dumps(qs)
 
-def handle_nick(j):
+def handle_chat_nick(j):
 	data=eval(j['content'])
 	nickname = data['nick']
 	wxid = data['wxid']
 	roomid = data['roomid']
 
-	sql_update(conn,f'r{roomid[:-9]}','groupUsrName',nickname,f"wxid = '{wxid}'")
+	sql_update(conn,f'r{roomid[:-9]}','groupUsrName',nickname,\
+				f"wxid = '{wxid}'")
 	# output(f'nickname:{nickname}')
 
 def get_chatroom_memberlist(roomid = 'null'):
@@ -387,8 +377,8 @@ def handle_memberlist(j):
 		roomid = d['room_id']
 		room_num = roomid[:-9]
 		# output(f'roomid:{roomid}')
-		members = d['member']
 
+		members = d['member']
 		sql_initialize_group(f'r{room_num}')
 
 		for m in members:
@@ -447,19 +437,36 @@ def handle_wxuser_list(j):
 	i=0
 	for item in j['content']:
 		i+=1
-		output(f"{i} {item['wxid']} {item['name']}")
-		if item['wxid'][-8:] == 'chatroom':
-			res = sql_fetch(cur,'Groupchats',['*'],f"roomid = '{item['wxid'][:-9]}'")
-			if len(res) == 0:
-				sql_insert(conn,cur,'Groupchats',['roomid','groupname'],[item['wxid'][:-9],item['name']])
-			sql_update(conn,'Groupchats','groupname',item['name'],f"roomid = '{item['wxid'][:-9]}'")
-		else:
-			sql_insert(conn,cur,'Users',['wxid','wxcode','realUsrName'],[item['wxid'],item['wxcode'],item['name']])
+		output(f"[{i}] {item['wxid']} {item['name']}")
 
+		# If item is chatroom
+		if item['wxid'][-8:] == 'chatroom':
+			room_id = item['wxid'][:-9]
+			group_name = item['name']
+
+			# Get if groupchat exist in record
+			res = sql_fetch(cur,'Groupchats',['*'],f"roomid = '{room_id}'")
+
+			# Does not exist, insert groupchat info into record
+			if len(res) == 0:
+				sql_insert(conn,cur,'Groupchats',\
+							['roomid','groupname','announce','rssPush'],\
+							[room_id,group_name,1,0])
+			# Exists, update groupchat infomation
+			else:
+				sql_update(conn,'Groupchats','groupname',group_name,\
+								f"roomid = '{room_id}'")
+
+		# If item is single user
+		else:
+			sql_insert(conn,cur,'Users',['wxid','wxcode','realUsrName'],\
+							[item['wxid'],item['wxcode'],item['name']])
+
+	# Recursively start to update chatroom's members
 	ws.send(get_chatroom_memberlist(item['wxid']))
 
 ################################# INITIALIZE ###############################
-def heartbeat(msgJson):
+def heartbeat_trigger(msgJson):
 	global undisturbed_hb, global_event_tick
 	undisturbed_hb += 1
 	global_event_tick += 1
@@ -470,23 +477,45 @@ def heartbeat(msgJson):
 	elif undisturbed_hb == 5:
 		output('Undisturbed in 5 min. Hiding heartbeat logs. zZZ',logtype = 'HEART_BEAT',mode = 'HIGHLIGHT')
 
-	# Every 10 min, Trigger a rss fetch
-	if global_event_tick % 10 == 0 and global_event_tick != 0:
-		tRss = Thread(target=rss_trigger,args = ())
+	# Every 30 min, Trigger a rss fetch
+	if global_event_tick % 30 == 0 and global_event_tick != 0:
+		tRss = Thread(target = rss_trigger, args = ())
 		global_event_tick = 0
 		tRss.start()
 
+	# Every 15 min, Trigger a battery check
+	if global_event_tick % 15 == 0 and global_event_tick != 0:
+		tBtry = Thread(target = btry_check_auto, args = ())
+		tBtry.start()
+
 def on_open(ws):
-	#初始化
+	#初始化 更新用户数据
 	ws.send(send_wxuser_list())
+
+	# Update Global Admin List
 	for wxid in OP_LIST:
 		sql_update(conn,'Users','powerLevel',3,f"wxid = '{wxid}'")
 
 	now=time.strftime("%Y-%m-%d %X")
 	ws.send(send_txt_msg(f'启动完成\n{now}',OP_LIST[0]))
 
+	# ASCII Art Credit: FigLet & Me
+	start_ascii_art = """
+
+#######################################################
+# ___       ______       ________________      _____  #
+# __ |     / /__(_)____________  /__  __ )_______  /_ #
+# __ | /| / /__  /__  __ \  __  /__  __  |  __ \  __/ #
+# __ |/ |/ / _  / _  / / / /_/ / _  /_/ // /_/ / /_   #
+# ____/|__/  /_/  /_/ /_/\__,_/  /_____/ \____/\__/   #
+#                                                     #
+#######################################################
+
+	"""
+	print(start_ascii_art)
+
 def on_error(ws,error):
-	output(f'on_error:{error}','ERROR','HIGHLIGHT','RED')
+	output(f"on_error:{error}",'ERROR','HIGHLIGHT','RED')
 
 def on_close(ws,signal,status):
 	output("Server Closed",'WARNING','HIGHLIGHT','WHITE')
@@ -495,7 +524,6 @@ def sql_initialize_group(roomid):
 	initialize_group = f'''CREATE TABLE IF NOT EXISTS {roomid}
 			(wxid TEXT,
 			groupUsrName TEXT);'''
-	# print(initialize_users)
 	conn.execute(initialize_group)
 	conn.commit()
 
@@ -510,7 +538,6 @@ def sql_initialize_users():
 			pjskID NUMBER NOT NULL DEFAULT -1,
 			maiID TEXT NOT NULL DEFAULT -1,
 			powerLevel NUMBER NULL DEFAULT 0,
-			isInLink TEXT NOT NULL DEFAULT -1,
 			banned NUMBER NOT NULL DEFAULT 0);'''
 	conn.execute(initialize_users)
 	conn.commit()
@@ -519,7 +546,8 @@ def sql_initialize_groupnames():
 	initialize_gn = f'''CREATE TABLE IF NOT EXISTS Groupchats
 			(roomid TEXT,
 			groupname TEXT
-			announce BOOL NOT NULL DEFAULT 0);'''
+			announce BOOL NOT NULL DEFAULT 0,
+			rssPush BOOL NOT NULL DEFAULT 1);'''
 	conn.execute(initialize_gn)
 	conn.commit()
 
@@ -580,29 +608,14 @@ def send_pic(filepath,wxid = 'null'):
 
 ############################## HANDLES #####################################
 def handle_status_msg(msgJson):
-	# output(f'收到消息:{msgJson}')
-	if '拍了拍我' in msgJson['content']['content']:
-		output(f"{msgJson['content']['content']}",'PAT',background = 'MINT')
+	vis_content = msgJson['content']['content']
+	if '拍了拍我' in vis_content:
+		output(vis_content,'PAT',background = 'MINT')
+		pat_wb(msgJson)
 
-		wxid = msgJson['content']['id1']
-
-		if wxid[-8:] == 'chatroom':
-			roomid = wxid
-			username = msgJson['content']['content'].split('"')[1]
-			wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{username}'")[0][0]
-			# output(f'{roomid} {username} {wxid}')
-
-		new_pat_times = sql_fetch(cur,'Users',['patTimes'],f"wxid = '{wxid}'")[0][0]+1
-		# output(new_pat_times)
-
-		sql_update(conn,'Users','patTimes',new_pat_times,f"wxid = '{wxid}'")
-
-		ws.send(send_txt_msg(f'第{new_pat_times}次了！',msgJson['content']['id1']))
-
-	elif '邀请' in msgJson['content']['content']:
+	elif '邀请' in vis_content:
 		ws.send(send_wxuser_list())
 		roomid=msgJson['content']['id1']
-		# nickname=msgJson['content']['content'].split('"')[-2]
 		ws.send(send_txt_msg(f'欢迎进群',wxid=roomid))
 
 def handle_sent_msg(msgJson):
@@ -664,6 +677,7 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	caller_isbanned = sql_fetch(cur,'Users',['banned'],f"wxid = '{callerid}'")
 	if caller_isbanned[0][0] == 1:
 		return
+
 	call_data = stringQ2B(keyword).split(' ')
 	if len(call_data) == 0:
 		ws.send('请指明需要调用的功能。')
@@ -672,23 +686,24 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	if len(call_data) > 1 and call_data[0] == '':
 		call_data = call_data[1:]
 
-	functions = {
+	WB_FUNC_DICT = {
 		'bind': bindID,
 		'patstat': patstat,
-		'gosen': gen_5000,
 		'fdbk': feedback,
+		'btry': btry_check_trigger,
 
 		'ban': ban,
 		'unban':unban,
 		'refresh': refresh,
-		'setadmin':setadmin,
+		'setadmin':set_admin,
 		'punch':punch,
-		'setsuper': setsuper,
+		'setsuper': set_super,
 		'announce': announce,
 		'annswitch': switch_announce,
 		'annview': view_announce,
 		'rssswitch': switch_rss,
 		'rssview': view_rss,
+		# 'testrss': test_rss_wrapper,
 
 		'logs': fetch_logs,
 
@@ -709,9 +724,11 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'pjskpf': pjskpf,
 		'pwhat': pjsk_alias_search,
 		'pinfo': pjsk_music_search,
+		'pcinfo': pjsk_chart_search,
 		'amikaiden': amIkaiden,
 		'pupdate': pjsk_data_update
 	}
+
 	'''
 	Terminal Log
 	'''
@@ -719,6 +736,13 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		output(f'{roomname}-{nickname}: {keyword}','CALL','HIGHLIGHT')
 	else:
 		output(f'{nickname}: {keyword}','CALL','HIGHLIGHT')
+
+
+	### HBD EASTER EGG ###
+	if call_data == ['minfo', '11391', 'mas', 'cb', '555']:
+		ws.send(send_txt_msg("HAPPY BIRTHDAY!!!",destination))
+		return
+	### HBD EASTER EGG ###
 
 	'''
 	Call individual function
@@ -743,28 +767,37 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		ws.send(send_txt_msg('请移步maimai b50。\n指令: mb50',destination))
 		return
 
+	# Now gosenchoyen generator runs on a sperate thread.
+	# Thank you Kevin
+	elif func_name == 'gosen':
+		tpjsk = Thread(target = gen_5000,\
+						args = (real_data,callerid,destination))
+		tpjsk.start()
+		return
+
 	# MAIMAI Best 50 runs on a seperate thread
 	elif func_name == 'mb50':
+		# If a player name is given
+		# Straight goes into the function no questions asked
 		real_data = call_data[1:]
-		# if a player name is given
-		if real_data:
-			real_data.insert(0,True)
-		else:
-			real_data = [True]
+
 		ws.send(send_txt_msg('正在获取',destination))
-		tmb50 = Thread(target=mai_best,args = (real_data,callerid,destination))
+		tmb50 = Thread(target=mai_best,\
+						args = (real_data,callerid,destination))
 		tmb50.start()
 		return
 
 	# Project Sekai Event fetch runs on a seperate thread
 	elif func_name == 'pjskev':
-		tpjsk = Thread(target = pjsk_curr_event,args = (real_data,callerid,destination))
+		tpjsk = Thread(target = pjsk_curr_event,\
+						args = (real_data,callerid,destination))
 		tpjsk.start()
 		return
 
 	# anime tracing runs on a seperate thread
 	elif func_name == 'whatanime':
-		tani = Thread(target = anime_by_url,args = (real_data,callerid,destination))
+		tani = Thread(target = anime_by_url,\
+						args = (real_data,callerid,destination))
 		tani.start()
 		return
 
@@ -773,17 +806,18 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		return
 
 	elif func_name == 'cmd':
-		tcmd = Thread(target = execute_cmd,args = (real_data,callerid,destination))
+		tcmd = Thread(target = cmd_trigger,\
+						args = (real_data,callerid,destination))
 		tcmd.start()
 		return
 
-	if func_name not in functions.keys():
+	if func_name not in WB_FUNC_DICT.keys():
 		output('Called non-existent function','WARNING',background = 'WHITE')
 		ws.send(send_txt_msg(f'没有该指令: {func_name}',destination))
 		return
 
 	try:
-		ansList = functions.get(func_name)(real_data,callerid,destination)
+		ansList = WB_FUNC_DICT.get(func_name)(real_data,callerid,destination)
 	# Error Happened. Push Error Msg to destination
 	except Exception as e:
 		output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
@@ -792,6 +826,10 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		return
 	# No Error happened in the function call
 	ws.send(send_function(ansList[0],destination))
+
+# Helper of handle_recv_call
+def execute_call(keyword,callerid,roomname = None):
+	pass
 
 def handle_recv_msg(msgJson):
 	global undisturbed_hb
@@ -808,60 +846,65 @@ def handle_recv_msg(msgJson):
 		roomid=msgJson['wxid'] #群id
 		senderid=msgJson['id1'] #个人id
 
-		nickname = sql_fetch(cur,f'r{roomid[:-9]}',['groupUsrName'],f"wxid = '{senderid}'")[0][0]
-		roomname = sql_fetch(cur,'Groupchats',['groupname'],f'roomid = {roomid[:-9]}')[0][0]
+		nickname = sql_fetch(cur,f'r{roomid[:-9]}',['groupUsrName'],\
+							f"wxid = '{senderid}'")[0][0]
+		roomname = sql_fetch(cur,'Groupchats',['groupname'],\
+							f'roomid = {roomid[:-9]}')[0][0]
 
-		'''
-		Handle User Calls
-		'''
+		# Handle User Calls
 		keyword=msgJson['content'].replace('\u2005','')
 		if keyword[:8] == '@WindBot':
 			handle_recv_call(keyword[8:],senderid,roomid,nickname,roomname)
 			return
-		'''
-		Terminal Log
-		'''
+
+		# Terminal Log Normal Messages
 		if not isCite:
 			output(f'{roomname}-{nickname}: {keyword}','GROUPCHAT')
 		else:
 			output(f"{roomname}-{nickname}: {keyword}\n\
-				「-> {msgJson['refnick']} : {msgJson['refcontent']}",'GROUPCHAT')
+				「-> {msgJson['refnick']} : {msgJson['refcontent']}",\
+				'GROUPCHAT')
 	else:
 		roomid = None
 		senderid=msgJson['wxid'] #个人id
 		destination = senderid
 
-		nickname = sql_fetch(cur,'Users',['realUsrName'],f"wxid = '{senderid}'")[0][0]
-		'''
-		Handle User Calls
-		'''
+		nickname = sql_fetch(cur,'Users',['realUsrName'],\
+							f"wxid = '{senderid}'")[0][0]
 
+		# Handle User Calls
 		keyword=msgJson['content'].replace('\u2005','')
 		if keyword[:2] == 'WB':
 			handle_recv_call(keyword[2:],senderid,senderid,nickname)
 			return
-		'''
-		Terminal Log
-		'''
+
+		# Terminal Log
 		if not isCite:
 			output(f'{nickname}: {keyword}','DM')
 		else:
 			output(f"{nickname}: {keyword}\n\
 				「-> {msgJson['refnick']} : {msgJson['refcontent']}",'DM')
 	'''
-	RESPONSE TO KEYWORD
+	RESPOND TO KEYWORD
 	'''
 	if keyword == 'help':
+		help_path = os.path.join(resource_path,"Help")
 		if roomid:
-			ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',msgJson['wxid']))
+			ws.send(send_attatch(os.path.join(help_path,"WindbotHelpGC.jpeg"),\
+								msgJson['wxid']))
 		else:
-			ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpDM.jpeg',msgJson['wxid']))
-	# elif keyword == 'linkhelp':
-		# ws.send(send_attatch(f'{resource_path}\\Help\\WindbotLinkHelp.jpg',msgJson['wxid']))
-	elif keyword=='ding':
-		ws.send(send_txt_msg('dong',wxid=msgJson['wxid']))
-	elif keyword=='dong':
-		ws.send(send_txt_msg('ding',wxid=msgJson['wxid']))
+			ws.send(send_attatch(os.path.join(help_path,"WindbotHelpDM.jpeg"),\
+								msgJson['wxid']))
+	elif keyword == 'ding':
+		ws.send(send_txt_msg('dong', wxid = msgJson['wxid']))
+	elif keyword == 'dong':
+		ws.send(send_txt_msg('ding', wxid = msgJson['wxid']))
+	elif keyword == 'bing':
+		ws.send(send_txt_msg('bong', wxid = msgJson['wxid']))
+	elif keyword == 'bong':
+		ws.send(send_txt_msg('bing', wxid = msgJson['wxid']))
+	elif keyword == 'BONG':
+		ws.send(send_txt_msg('DONG', wxid = msgJson['wxid']))
 	elif keyword == '6':
 		if roomid:
 			ws.send(send_txt_msg('WB很不喜欢单走一个6哦',wxid=msgJson['wxid']))
@@ -870,10 +913,11 @@ def handle_recv_msg(msgJson):
 		replies = ['‎‎','全ては一つの幸福に集约された。今日という日は人类が真の幸切った辉かしい历史の転换である','U,iNVERSE']
 		ws.send(send_txt_msg(random.choice(replies),wxid=msgJson['wxid']))
 	elif keyword == '‎':
-		replies = ['₂ₓ']
-		ws.send(send_txt_msg(random.choice(replies),wxid=msgJson['wxid']))
-	elif keyword == 'friday' or keyword == 'Friday':
-		ws.send(send_txt_msg(today_is_friday_in_california(msgJson['wxid']),wxid = msgJson['wxid']))
+		reply_txt = "₂ₓ"
+		ws.send(send_txt_msg(reply_txt, wxid = msgJson['wxid']))
+	elif keyword.lower() == 'friday':
+		ws.send(send_txt_msg(today_is_friday_in_california(msgJson['wxid']),\
+							wxid = msgJson['wxid']))
 
 def Q2B(uchar):
     """单个字符 全角转半角"""
@@ -891,7 +935,7 @@ def stringQ2B(ustring):
     return "".join([Q2B(uchar) for uchar in ustring])
 
 ######################### ON MSG SWITCH #####################################
-def on_message(ws,message):
+def on_localapi_message(ws,message):
 	j=json.loads(message)
 	resp_type=j['type']
 	# output(j)
@@ -899,7 +943,7 @@ def on_message(ws,message):
 
 	# switch结构
 	action={
-		CHATROOM_MEMBER_NICK:handle_nick,
+		CHATROOM_MEMBER_NICK:handle_chat_nick,
 		PERSONAL_DETAIL:handle_personal_detail,
 		AT_MSG:handle_at_msg,
 		DEBUG_SWITCH:handle_recv_msg,
@@ -912,7 +956,7 @@ def on_message(ws,message):
 		RECV_PIC_MSG:handle_recv_pic,
 		RECV_TXT_MSG:handle_recv_msg,
 		RECV_TXT_CITE_MSG:handle_xml_msg,
-		HEART_BEAT:heartbeat,
+		HEART_BEAT:heartbeat_trigger,
 		USER_LIST:handle_wxuser_list,
 		GET_USER_LIST_SUCCSESS:handle_wxuser_list,
 		GET_USER_LIST_FAIL:handle_wxuser_list,
@@ -920,7 +964,7 @@ def on_message(ws,message):
 	}
 	action.get(resp_type,print)(j)
 
-############################# FUNCTIONS #####################################
+########################## USER FUNCTIONS ###################################
 def bindID(datalist,callerid,roomid = None):
 	bindapp = {
 		'arc': 'arcID',
@@ -952,6 +996,31 @@ def bindID(datalist,callerid,roomid = None):
 		sql_update(conn,'Users',appsqlID,usrID,f"wxid = '{callerid}'")
 		reply_txt = f'已绑定至 {app}ID: {usrID}'
 	return [reply_txt]
+
+def pat_wb(msgJson):
+	# Refresh the user library to get latest username
+	### NOT WORKING, TIME TO REWRITE IN ASYNC BABY
+	# ws.send(send_wxuser_list())
+
+	wxid = msgJson['content']['id1']
+	username = None
+
+	# If Pat Comes From a Groupchat
+	if wxid[-8:] == 'chatroom':
+		roomid = wxid
+		username = msgJson['content']['content'].split('"')[1]
+		wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],\
+							f"groupUsrName = '{username}'")[0][0]
+
+	# Increment Recorded patTimes by 1
+	rec_pat_times = sql_fetch(cur,'Users',['patTimes'],\
+							f"wxid = '{wxid}'")[0][0]
+	new_pat_times = rec_pat_times + 1
+	sql_update(conn,'Users','patTimes',new_pat_times,f"wxid = '{wxid}'")
+
+	# Reply
+	reply_txt = f"第{new_pat_times}次了！"
+	ws.send(send_txt_msg(reply_txt,msgJson['content']['id1']))
 
 def patstat(datalist,callerid,roomid = None):
 	patTimes = sql_fetch(cur,'Users',['patTimes'],f"wxid = '{callerid}'")[0][0]
@@ -1074,16 +1143,15 @@ def anilist_fetchfromid(query:str,vars_: dict):
 def mai_best(datalist,callerid,roomid = None):
 	conn_thread = sqlite3.connect('./windbotDB.db')
 	cur_thread = conn_thread.cursor()
-	if len(datalist) > 1:
-		gamertag = datalist[1]
+	if datalist != []:
+		gamertag = datalist[0]
 	else:
 		gamertag = sql_fetch(cur_thread,'Users',['maiID'],f"wxid = '{callerid}'")[0][0]
 		if gamertag == '-1':
 			ws.send(send_txt_msg('您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: @WindBot bind mai xxxxx',roomid))
 			return
 
-	b50 = datalist[0]
-	image = draw_best_image(gamertag,b50)
+	image = draw_best_image(gamertag)
 
 	if image == -2:
 		ws.send(send_txt_msg('该用户选择不公开数据。',roomid))
@@ -1100,6 +1168,10 @@ def mai_best(datalist,callerid,roomid = None):
 	ws.send(send_attatch(os.path.join(store_path,f'{gamertag}.png'),roomid))
 
 #-----RSS-----
+def test_rss_wrapper(datalist,callerid,roomid = None):
+	rss_trigger()
+	return ['Tested']
+
 def rss_trigger():
 	pushed = False
 	for subscribed in rss_subscriptions:
@@ -1107,14 +1179,21 @@ def rss_trigger():
 		to_push = check_rss(*subscribed)
 
 		# Has new feed
-		if to_push != -1:
+		if to_push not in (-1,-2,-3):
 			pushed = True
 			for feed in to_push:
 				final_feed = finalize_feed(*feed)
 				rss_push(final_feed)
+		elif to_push == -2:
+			output(f'Website Blocked Feed (412) for {subscribed}',\
+					logtype = 'RSS',background = 'RED')
+		elif to_push == -3:
+			output(f'Connection Timed Out for {subscribed}',\
+					logtype = 'RSS',background = 'RED')
 	if pushed:
 		output('Pushed New Feed',logtype = 'RSS',background = 'PURPLE')
-	else:
+	# No New Feed
+	elif to_push == -1:
 		output('No New Feed',logtype = 'RSS',background = 'PURPLE')
 
 def rss_push(feed):
@@ -1135,7 +1214,7 @@ def rss_push(feed):
 			# Send text feed
 			ws.send(send_txt_msg(content,group_id))
 			# If the feed contain images
-			if len(feed) > 1:
+			if feed[1] != None:
 				ws.send(send_attatch(feed[1],group_id))
 			# Record group in feedback
 			op_fdbk_txt += f"{g[1]}({g[0]})\n"
@@ -1143,130 +1222,16 @@ def rss_push(feed):
 		ws.send(send_txt_msg(op_fdbk_txt,OP_LIST[0]))
 
 ########################## MANAGING FUNCTIONS ##############################
-def ban(datalist,callerid,roomid):
-	# output(datalist)
-	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
-	# output(caller_level)
-
-	if caller_level[0][0] < 2:
-		return ['您的权限不足。']
-	# output(roomid)
-
-	if datalist[0] == '*':
-		datalist = [row[0] for row in sql_fetch(cur,f'r{roomid[:-9]}',['wxid'])]
-
-	cnt = 0
-	for nickname in datalist:
-		wxid = nickname
-		if wxid[:4] != 'wxid':
-			try:
-				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
-			except Exception as _:
-				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
-				continue
-		if wxid in OP_LIST:
-			ws.send(send_txt_msg('已跳过管理员',roomid))
-			continue
-		cnt += 1
-		# output(wxid)
-		sql_update(conn,'Users','banned',1,f"wxid = '{wxid}'")
-
-	return[f'应Ban{len(datalist)}人,实Ban{cnt}人,下班']
-
-def unban(datalist,callerid,roomid):
-	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
-
-	if caller_level[0][0] < 2:
-		return ['您的权限不足。']
-
-	# output(roomid)
-	if datalist[0] == '*':
-		datalist = [row[0] for row in sql_fetch(cur,f'r{roomid[:-9]}',['wxid'])]
-
-	cnt = 0
-	for nickname in datalist:
-		wxid = nickname
-		if wxid[:4] != 'wxid':
-			try:
-				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
-			except Exception as e:
-				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
-				continue
-		cnt += 1
-		# output(wxid)
-		sql_update(conn,'Users','banned','0',f"wxid = '{wxid}'")
-
-	return[f'应Unban{len(datalist)}人,实Unban{cnt}人,下班']
-
 def refresh(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 
 	if caller_level[0][0] < 3:
 		return ['您的权限不足。']
 
+	# Start the Refresh Process
 	ws.send(send_wxuser_list())
+
 	return['已刷新']
-
-def setadmin(datalist,callerid,roomid = None):
-	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
-	# output(caller_level)
-
-	if caller_level[0][0] < 2:
-		return ['您的权限不足。']
-
-	if datalist[0] == '*':
-		datalist = [row[0] for row in sql_fetch(cur,f'r{roomid[:-9]}',['wxid'])]
-
-	cnt = 0
-	for nickname in datalist:
-		wxid = nickname
-		if wxid[:4] != 'wxid':
-			try:
-				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
-				if wxid in OP_LIST:
-					continue
-			except Exception as e:
-				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
-				continue
-		cnt+=1
-		# output(wxid)
-		sql_update(conn,'Users','powerLevel',2,f"wxid = '{wxid}'")
-
-	return[f'应设置{len(datalist)}人,实设置{cnt}人,下班']
-
-def punch(datalist,callerid,roomid = None):
-	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
-	# output(caller_level)
-
-	if caller_level[0][0] < 2:
-		return ['您的权限不足。']
-	cnt = 0
-
-	if datalist[0] == '*':
-		datalist = [row[0] for row in sql_fetch(cur,f'r{roomid[:-9]}',['wxid'])]
-
-	for nickname in datalist:
-		wxid = nickname
-		if wxid[:4] != 'wxid':
-			try:
-				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
-			except Exception as e:
-				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
-				continue
-		if wxid in OP_LIST:
-			ws.send(send_txt_msg('已跳过WDS',roomid))
-			continue
-		# output(wxid)
-		cnt+=1
-		sql_update(conn,'Users','powerLevel',0,f"wxid = '{wxid}'")
-
-	return[f'应取消{len(datalist)}人,实取消{cnt}人,下班']
-
-def setsuper(datalist,callerid,roomid = None):
-	ws.send(send_txt_msg('NEVER GONNA GIVE YOU UP\nBUT I AM GONNA LET YOU DOWN\nSAY GOODBYE',roomid))
-	ban([callerid],'wxid_xd4gc9mu3stx12',roomid)
-	punch([callerid],'wxid_xd4gc9mu3stx12',roomid)
-	return['']
 
 def fetch_logs(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
@@ -1279,6 +1244,7 @@ def fetch_logs(datalist,callerid,roomid = None):
 		log_wanted_cnt = int(datalist[0])
 
 	reply_txt = ''.join(l+'\n' for l in latest_logs[-(log_wanted_cnt):])
+	reply_txt += f"===END OF LOG (Total {log_wanted_cnt})==="
 
 	return [reply_txt]
 
@@ -1368,27 +1334,29 @@ def view_rss(datalist,callerid,roomid = None):
 		reply_txt += f'{group[1]} ({group[0]}): {bool(group[3])}\n'
 	return [reply_txt]
 
-def execute_cmd(datalist,callerid,roomid = None):
-	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
-	cur = conn.cursor()
-	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
-	if caller_level[0][0] < 3:
-		ws.send(send_txt_msg('您的权限不足。',roomid))
-		return
+def execute_cmd(datalist):
 	timeout_s = 10
 	try:
 		shell = subprocess.Popen(datalist,stdout=subprocess.PIPE,\
 				stderr=subprocess.PIPE, text=True, shell = True)
 		shell.wait()
 	except subprocess.TimeoutExpired:
-		ws.send(send_txt_msg(f'Timeout for {datalist} ({timeout_s}s) expired',roomid))
-		return
+		return 'Timeout for {datalist} ({timeout_s}s) expired'
 	shell_res, shell_err = shell.communicate()
 	shell.kill()
 	if shell_res == '':
-		ws.send(send_txt_msg(shell_err,roomid))
+		return shell_err
+	else:
+		return shell_res
+
+def cmd_trigger(datalist,callerid,roomid = None):
+	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
+	cur = conn.cursor()
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	if caller_level[0][0] < 3:
+		ws.send(send_txt_msg('您的权限不足。',roomid))
 		return
-	ws.send(send_txt_msg(shell_res,roomid))
+	ws.send(send_txt_msg(execute_cmd(datalist),roomid))
 
 def feedback(datalist,callerid,roomid = None):
 	if len(datalist) == 0:
@@ -1410,28 +1378,204 @@ def feedback(datalist,callerid,roomid = None):
 		ws.send(send_txt_msg(msg,handler))
 		return ['发送完成']
 
+def system_battery_status():
+	cmd = "WMIC Path Win32_Battery Get BatteryStatus"
+	datalist = cmd.split(" ")
+	result = execute_cmd(datalist).strip().split("\n")
+	status = int(result[2])
+	status_dict = { 1: "Other",
+					2: "Unknown",
+					3: "Fully Charged",
+					4: "Low",
+					5: "Critical",
+					6: "Charging",
+					7: "Charging and High",
+					8: "Charging and Low",
+					9: "Charging and Critical",
+					10: "Undefined"}
+	btry_description = status_dict.get(status, "NULL")
+
+	# Discharging
+	if status in [1,4,5]:
+		btry_status =  0
+	# Charging
+	elif status in [2,6,7,8,9]:
+		btry_status =  1
+	# FULL
+	elif status == 3:
+		btry_status =  2
+	# No Battery Instance
+	elif status == 10:
+		btry_status =  -1
+	# Unknown Value
+	else:
+		btry_status =  -2
+
+	return (btry_status, btry_description)
+
+def btry_check_auto():
+	status, description = system_battery_status()
+	if status == 0:
+		ws.send(send_txt_msg("[警告] 机器目前电池情况: {description}"),OP_LIST[0])
+		output(f"DISCHARGING BATTERY - {description}",\
+				logtype = "WARNING", background = "RED")
+	else:
+		output(f"OK BATTERY STATUS - {description}",\
+				logtype = "SYSTEM", background = "WHITE")
+
+def btry_check_trigger(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	if caller_level[0][0] < 3:
+		ws.send(send_txt_msg('您的权限不足。',roomid))
+		return
+	status, description = system_battery_status()
+	status_str = ["DISCHARGING", "Charging", "Full", "Unknown" ,"No Battery"]
+	reply_txt = f"Battery Status: {status_str[status]}\n{description}"
+	return [reply_txt]
+
+##################### GROUP MANAGING FUNCTIONS ##############################
+def ban(datalist,callerid,roomid = None):
+	# output(datalist)
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	# output(caller_level)
+
+	if caller_level[0][0] < 2:
+		return ['您的权限不足。']
+	# output(roomid)
+
+	if datalist[0] == '*':
+		datalist = [row[0] for row in sql_fetch(cur,f'r{roomid[:-9]}',['wxid'])]
+
+	cnt = 0
+	for nickname in datalist:
+		wxid = nickname
+		if wxid[:4] != 'wxid':
+			try:
+				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
+			except Exception as _:
+				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
+				continue
+		if wxid in OP_LIST:
+			ws.send(send_txt_msg('已跳过管理员',roomid))
+			continue
+		cnt += 1
+		# output(wxid)
+		sql_update(conn,'Users','banned',1,f"wxid = '{wxid}'")
+
+	return[f'应Ban{len(datalist)}人,实Ban{cnt}人,下班']
+
+def unban(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+
+	if caller_level[0][0] < 2:
+		return ['您的权限不足。']
+
+	# output(roomid)
+	if datalist[0] == '*':
+		datalist = [row[0] for row in sql_fetch(cur,f'r{roomid[:-9]}',['wxid'])]
+
+	cnt = 0
+	for nickname in datalist:
+		wxid = nickname
+		if wxid[:4] != 'wxid':
+			try:
+				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
+			except Exception as e:
+				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
+				continue
+		cnt += 1
+		# output(wxid)
+		sql_update(conn,'Users','banned','0',f"wxid = '{wxid}'")
+
+	return[f'应Unban{len(datalist)}人,实Unban{cnt}人,下班']
+
+def set_admin(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	# output(caller_level)
+
+	if caller_level[0][0] < 2:
+		return ['您的权限不足。']
+
+	if datalist[0] == '*':
+		datalist = [row[0] for row in sql_fetch(cur,f'r{roomid[:-9]}',['wxid'])]
+
+	cnt = 0
+	for nickname in datalist:
+		wxid = nickname
+		if wxid[:4] != 'wxid':
+			try:
+				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
+				if wxid in OP_LIST:
+					continue
+			except Exception as e:
+				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
+				continue
+		cnt+=1
+		# output(wxid)
+		sql_update(conn,'Users','powerLevel',2,f"wxid = '{wxid}'")
+
+	return[f'应设置{len(datalist)}人,实设置{cnt}人,下班']
+
+def punch(datalist,callerid,roomid = None):
+	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
+	# output(caller_level)
+
+	if caller_level[0][0] < 2:
+		return ['您的权限不足。']
+	cnt = 0
+
+	if datalist[0] == '*':
+		datalist = [row[0] for row in sql_fetch(cur,f'r{roomid[:-9]}',['wxid'])]
+
+	for nickname in datalist:
+		wxid = nickname
+		if wxid[:4] != 'wxid':
+			try:
+				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
+			except Exception as e:
+				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
+				continue
+		if wxid in OP_LIST:
+			ws.send(send_txt_msg('已跳过WDS',roomid))
+			continue
+		# output(wxid)
+		cnt+=1
+		sql_update(conn,'Users','powerLevel',0,f"wxid = '{wxid}'")
+
+	return[f'应取消{len(datalist)}人,实取消{cnt}人,下班']
+
+def set_super(datalist,callerid,roomid = None):
+	ws.send(send_txt_msg('NEVER GONNA GIVE YOU UP\nBUT I AM GONNA LET YOU DOWN\nSAY GOODBYE',roomid))
+	ban([callerid],'wxid_xd4gc9mu3stx12',roomid)
+	punch([callerid],'wxid_xd4gc9mu3stx12',roomid)
+	return['']
+
+def list_admin(datalist,callerid,roomid = None):
+	pass
+
 ################################ MAIN #######################################
 if __name__ == "__main__":
 	''' Initialize SQL'''
-	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
+	conn = sqlite3.connect(os.path.join(project_path, "windbotDB.db"))
 	cur = conn.cursor()
-	# conn.execute('''ALTER TABLE Groupchats ADD COLUMN rssPush BOOL NOT NULL DEFAULT 0''')
+
+	# conn.execute('''ALTER TABLE Users DROP COLUMN isInLink''')
+
 	sql_initialize_users()
 	sql_initialize_groupnames()	
 
-	arcdb = sqlite3.connect(f'{project_path}\\arcsong.db')
+	arcdb = sqlite3.connect(os.path.join(project_path, "arcsong.db"))
 	arcur = arcdb.cursor()
 
 	'''Initialize Websocket'''
 	# websocket.enableTrace(True)
 	ws = websocket.WebSocketApp(SERVER,
-							on_open=on_open,
-							on_message=on_message,
-							on_error=on_error,
-							on_close=on_close)
+							on_open = on_open,
+							on_message = on_localapi_message,
+							on_error = on_error,
+							on_close = on_close)
 
 	# Set dispatcher to automatic reconnection, 5 second reconnect delay if connection closed unexpectedly
-	ws.run_forever(dispatcher=rel, reconnect=5)
+	ws.run_forever(dispatcher = rel, reconnect = 5)
 	rel.signal(2, rel.abort)  # Keyboard Interrupt
 	rel.dispatch()
-	# ws.run_forever(ping_interval=30)
