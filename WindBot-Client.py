@@ -101,7 +101,7 @@ undisturbed_hb = 0
 global_event_tick = 0
 
 '''Admins'''
-OP_LIST = ['wxid_xd4gc9mu3stx12']
+OP_LIST = ['ADMIN WXID']
 
 '''Local Resource Path'''
 project_path = os.path.join(os.path.dirname(__file__))
