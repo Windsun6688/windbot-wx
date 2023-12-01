@@ -673,7 +673,7 @@ def handle_recv_pic(msgJson):
 		'''
 		output(f'{nickname}: [IMAGE]','DM')
 
-def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
+def handle_recv_call(keyword,callerid,destination):
 	caller_isbanned = sql_fetch(cur,'Users',['banned'],f"wxid = '{callerid}'")
 	if caller_isbanned[0][0] == 1:
 		return
@@ -682,10 +682,36 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 	if len(call_data) == 0:
 		ws.send('请指明需要调用的功能。')
 		return
-	#handle mobile @
+
+	# Handle Mobile @
 	if len(call_data) > 1 and call_data[0] == '':
 		call_data = call_data[1:]
 
+	### HBD EASTER EGG ###
+	if call_data == ['minfo', '11391', 'mas', 'cb', '555']:
+		ws.send(send_txt_msg("HAPPY BIRTHDAY!!!",destination))
+		return
+	### HBD EASTER EGG ###
+
+	'''
+	Call individual function
+	'''
+	func_name = call_data[0].lower()
+	real_data = call_data[1:]
+
+	# MAIMAI Best 50 runs on a seperate thread
+	if func_name == 'mb50':
+		ws.send(send_txt_msg('正在获取',destination))
+
+	elif func_name == 'help':
+		ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',\
+				destination))
+		return
+
+	execute_call(func_name,real_data,callerid,destination)
+
+# Helper of handle_recv_call
+def execute_call(func_name, real_data, callerid, destination):
 	WB_FUNC_DICT = {
 		'bind': bindID,
 		'patstat': patstat,
@@ -729,107 +755,53 @@ def handle_recv_call(keyword,callerid,destination,nickname,roomname = None):
 		'pupdate': pjsk_data_update
 	}
 
-	'''
-	Terminal Log
-	'''
-	if roomname:
-		output(f'{roomname}-{nickname}: {keyword}','CALL','HIGHLIGHT')
+	DEPRECIATED_FUNC_DICT = {
+		"b30": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
+		"arcrecent": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
+		"mb40": "请移步maimai b50。\n指令: mb50"
+	}
+
+	THREADED_FUNC_DICT = {
+		"gosen": gen_5000, # Thank you Kevin
+		"mb50": mai_best,
+		"pjskev": pjsk_curr_event,
+		"whatanime": anime_by_url,
+		"cmd": cmd_trigger
+	}
+
+	# Depreciated Functions
+	if func_name in DEPRECIATED_FUNC_DICT:
+		ws.send(send_txt_msg(DEPRECIATED_FUNC_DICT[func_name],destination))
+		return
+
+	# Functions that runs on a independent thread
+	elif func_name in THREADED_FUNC_DICT:
+		tFunc = Thread(target = THREADED_FUNC_DICT[func_name],\
+						args = (real_data,callerid,destination))
+		tFunc.start()
+		return
+
+	# Normal Functions
+	elif func_name in WB_FUNC_DICT:
+		try:
+			ansList = WB_FUNC_DICT.get(func_name)\
+					(real_data,callerid,destination)
+
+		# Error Happened. Push Error Msg to destination
+		except Exception as e:
+			output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
+			output(traceback.format_exc(),'ERROR','HIGHLIGHT','RED')
+			ws.send(send_txt_msg(f"出错了＿|￣|○\n指令: {func_name}\n错误细节: {e}\n请尝试检查指令参数，调用help或把WDS@出来",destination))
+			return
+
+		# No Error Happened
+		ws.send(send_txt_msg(ansList[0],destination))
+		return
+
+	# Non-Existent Function
 	else:
-		output(f'{nickname}: {keyword}','CALL','HIGHLIGHT')
-
-
-	### HBD EASTER EGG ###
-	if call_data == ['minfo', '11391', 'mas', 'cb', '555']:
-		ws.send(send_txt_msg("HAPPY BIRTHDAY!!!",destination))
-		return
-	### HBD EASTER EGG ###
-
-	'''
-	Call individual function
-	'''
-	real_data = call_data[1:]
-	send_function = send_txt_msg
-	func_name = call_data[0].lower()
-
-	# Best XX Function runs on a seperate thread
-	# Depreciated as Arcaea API limit
-	if func_name[0] == 'b' and func_name[1:].isdigit():
-		ws.send(send_txt_msg('Arcaea分数相关功能因Estertion查分器下线原因暂停使用。',destination))
-		return
-
-	# Arc Recent Depreciated
-	elif func_name == 'arcrecent':
-		ws.send(send_txt_msg('Arcaea分数相关功能因Estertion查分器下线原因暂停使用。',destination))
-		return
-
-	# MAIMAI Best 40 is Depreciated
-	elif func_name == 'mb40':
-		ws.send(send_txt_msg('请移步maimai b50。\n指令: mb50',destination))
-		return
-
-	# Now gosenchoyen generator runs on a sperate thread.
-	# Thank you Kevin
-	elif func_name == 'gosen':
-		tpjsk = Thread(target = gen_5000,\
-						args = (real_data,callerid,destination))
-		tpjsk.start()
-		return
-
-	# MAIMAI Best 50 runs on a seperate thread
-	elif func_name == 'mb50':
-		# If a player name is given
-		# Straight goes into the function no questions asked
-		real_data = call_data[1:]
-
-		ws.send(send_txt_msg('正在获取',destination))
-		tmb50 = Thread(target=mai_best,\
-						args = (real_data,callerid,destination))
-		tmb50.start()
-		return
-
-	# Project Sekai Event fetch runs on a seperate thread
-	elif func_name == 'pjskev':
-		tpjsk = Thread(target = pjsk_curr_event,\
-						args = (real_data,callerid,destination))
-		tpjsk.start()
-		return
-
-	# anime tracing runs on a seperate thread
-	elif func_name == 'whatanime':
-		tani = Thread(target = anime_by_url,\
-						args = (real_data,callerid,destination))
-		tani.start()
-		return
-
-	elif func_name == 'help':
-		ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',destination))
-		return
-
-	elif func_name == 'cmd':
-		tcmd = Thread(target = cmd_trigger,\
-						args = (real_data,callerid,destination))
-		tcmd.start()
-		return
-
-	if func_name not in WB_FUNC_DICT.keys():
 		output('Called non-existent function','WARNING',background = 'WHITE')
-		ws.send(send_txt_msg(f'没有该指令: {func_name}',destination))
-		return
-
-	try:
-		ansList = WB_FUNC_DICT.get(func_name)(real_data,callerid,destination)
-	# Error Happened. Push Error Msg to destination
-	except Exception as e:
-		output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
-		ws.send(send_txt_msg(f'出错了＿|￣|○\n指令: {func_name}\n错误细节: {e}\n请尝试检查指令参数，调用help或把WDS@出来',destination))
-		output(traceback.format_exc(),'ERROR','HIGHLIGHT','RED')
-		return
-	# No Error happened in the function call
-	ws.send(send_function(ansList[0],destination))
-
-# Helper of handle_recv_call
-def execute_call(keyword,callerid,roomname = None):
-	pass
+		return f"没有该指令: {func_name}"
 
 def handle_recv_msg(msgJson):
 	global undisturbed_hb
@@ -854,13 +826,15 @@ def handle_recv_msg(msgJson):
 		# Handle User Calls
 		keyword=msgJson['content'].replace('\u2005','')
 		if keyword[:8] == '@WindBot':
-			handle_recv_call(keyword[8:],senderid,roomid,nickname,roomname)
+			output(f'{roomname}-{nickname}: {keyword[8:]}','CALL','HIGHLIGHT')
+			handle_recv_call(keyword[8:],senderid,roomid)
 			return
 
 		# Terminal Log Normal Messages
 		if not isCite:
 			output(f'{roomname}-{nickname}: {keyword}','GROUPCHAT')
 		else:
+			print(eval(msgJson['refcontent']))
 			output(f"{roomname}-{nickname}: {keyword}\n\
 				「-> {msgJson['refnick']} : {msgJson['refcontent']}",\
 				'GROUPCHAT')
@@ -875,10 +849,11 @@ def handle_recv_msg(msgJson):
 		# Handle User Calls
 		keyword=msgJson['content'].replace('\u2005','')
 		if keyword[:2] == 'WB':
-			handle_recv_call(keyword[2:],senderid,senderid,nickname)
+			output(f'{nickname}: {keyword}','CALL','HIGHLIGHT')
+			handle_recv_call(keyword[2:],senderid,senderid)
 			return
 
-		# Terminal Log
+		# Terminal Log Normal Messages
 		if not isCite:
 			output(f'{nickname}: {keyword}','DM')
 		else:
