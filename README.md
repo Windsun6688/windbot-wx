@@ -2,6 +2,16 @@
 ![](https://img.shields.io/github/last-commit/Windsun6688/windbot-wx?style=for-the-badge)
 ![](https://img.shields.io/github/commit-activity/w/Windsun6688/windbot-wx?style=for-the-badge)
 
+```
+#######################################################
+# ___       ______       ________________      _____  #
+# __ |     / /__(_)____________  /__  __ )_______  /_ #
+# __ | /| / /__  /__  __ \  __  /__  __  |  __ \  __/ #
+# __ |/ |/ / _  / _  / / / /_/ / _  /_/ // /_/ / /_   #
+# ____/|__/  /_/  /_/ /_/\__,_/  /_____/ \____/\__/   #
+#                                                     #
+#######################################################
+```
 
 A chatbot that provides mainly rhythm-game-related features.
 提供音乐游戏相关服务的聊天软件机器人。
@@ -33,6 +43,23 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 <details>
   <summary>点我展开 Click To Expand</summary>
 
+  - 2023.12.1
+    - 改善了功能呼叫结构
+    - 新增功能:
+      - 机器电池检测功能，失去墙插自动提醒管理员
+  - 2023.11.25
+    - 修复了rss推送功能的
+      ```
+      题@个:
+      这       
+      Link: 问
+      ```
+  - 2023.10.18
+    - 修复功能: pjskpf, amikaiden
+    - 新增功能:
+      - pwhat [alias] pjsk别名库
+      - pinfo [ID | Title] pjsk歌曲信息
+      - pcinfo [ID] pjsk谱面信息
   - 2023.9.14
     - 修复rss推送会重复推送，动态删除导致不再判断刷新的问题
   - 2023.9.11
