@@ -186,7 +186,7 @@ def mai_plate_status(gamertag,datalist):
     elif plate_state_id == 1:
         for i in range(0,3):
             reply_txt += f"- {diffs[i]}难度剩余{remaining_cnt_list[i]}张谱面\n"
-            reply_txt += f"- 总共: {total_remaining_cnt}张谱面\n"
+        reply_txt += f"- 总共: {total_remaining_cnt}张谱面\n"
 
     # Plate is Completed
     else:
