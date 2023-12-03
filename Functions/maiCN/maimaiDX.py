@@ -8,20 +8,27 @@ from ..sqlHelper import *
 static = os.path.join(resource_root,'maiCN')
 material = os.path.join(static,'material')
 
-scoreRank = ['d', 'c', 'b', 'bb', 'bbb', 'a', 'aa', 'aaa', 's', 's+', 'ss', 'ss+', 'sss', 'sss+']
+scoreRank = ['d', 'c', 'b', 'bb', 'bbb', 'a', 'aa', 'aaa',\
+            's', 's+', 'ss', 'ss+', 'sss', 'sss+']
 comboRank = ['fc', 'fc+', 'ap', 'ap+']
 combo_rank = ['fc', 'fcp', 'ap', 'app']
-full_combo_rank = ['[FULL COMBO] ','[FULL COMBO+] ','[ALL PERFECT] ','[ALL PERFECT+] ']
+full_combo_rank = ['[FULL COMBO] ','[FULL COMBO+] ',\
+                    '[ALL PERFECT] ','[ALL PERFECT+] ']
 syncRank = ['fs', 'fs+', 'fdx', 'fdx+']
 sync_rank = ['fs', 'fsp', 'fsd', 'fsdp']
-full_sync_rank = ['<FULL SYNC> ','<FULL SYNC+> ','<FULL SYNC DX> ','<FULL SYNC DX+> ']
+full_sync_rank = ['<FULL SYNC> ','<FULL SYNC+> ',\
+                    '<FULL SYNC DX> ','<FULL SYNC DX+> ']
 diffs = ['Basic', 'Advanced', 'Expert', 'Master', 'Re:Master']
-levelList = ['1', '2', '3', '4', '5', '6', '7', '7+', '8', '8+', '9', '9+', '10', '10+', '11', '11+', '12', '12+', '13', '13+', '14', '14+', '15']
-achievementList = [50.0, 60.0, 70.0, 75.0, 80.0, 90.0, 94.0, 97.0, 98.0, 99.0, 99.5, 100.0, 100.5]
-BaseRa = [0.0, 5.0, 6.0, 7.0, 7.5, 8.5, 9.5, 10.5, 12.5, 12.7, 13.0, 13.2, 13.5, 14.0]
-BaseRaSpp = [7.0, 8.0, 9.6, 11.2, 12.0, 13.6, 15.2, 16.8, 20.0, 20.3, 20.8, 21.1, 21.6, 22.4]
+levelList = ['1', '2', '3', '4', '5', '6', '7', '7+', '8', '8+', '9','9+',\
+        '10', '10+', '11', '11+', '12', '12+', '13', '13+', '14', '14+', '15']
+achievementList = [50.0, 60.0, 70.0, 75.0, 80.0, 90.0, 94.0,\
+                    97.0, 98.0, 99.0, 99.5, 100.0, 100.5]
+BaseRa = [0.0, 5.0, 6.0, 7.0, 7.5, 8.5, 9.5, 10.5, 12.5, 12.7,\
+                    13.0, 13.2, 13.5, 14.0]
+BaseRaSpp = [7.0, 8.0, 9.6, 11.2, 12.0, 13.6, 15.2, 16.8, 20.0,\
+                    20.3, 20.8, 21.1, 21.6, 22.4]
 
-ALIAS = {
+API_ALIAS = {
     'all': 'MaimaiDXAlias',
     'songs': 'GetSongs',
     'alias': 'GetSongsAlias',
@@ -31,13 +38,46 @@ ALIAS = {
     'end': 'GetAliasEnd'
 }
 
-def mai_api_get(gamertag: str, b50: bool = False,mode: str = 'player'):
-    url = f'https://www.diving-fish.com/api/maimaidxprober/query/{mode}'
+PLATE_2_VER = {
+    '初': 'maimai',
+    '真': 'maimai PLUS',
+    '超': 'maimai GreeN',
+    '檄': 'maimai GreeN PLUS',
+    '橙': 'maimai ORANGE',
+    '暁': 'maimai ORANGE PLUS',
+    '晓': 'maimai ORANGE PLUS',
+    '桃': 'maimai PiNK',
+    '櫻': 'maimai PiNK PLUS',
+    '樱': 'maimai PiNK PLUS',
+    '紫': 'maimai MURASAKi',
+    '菫': 'maimai MURASAKi PLUS',
+    '堇': 'maimai MURASAKi PLUS',
+    '白': 'maimai MiLK',
+    '雪': 'MiLK PLUS',
+    '輝': 'maimai FiNALE',
+    '辉': 'maimai FiNALE',
+    '熊': 'maimai でらっくす',
+    '華': 'maimai でらっくす PLUS',
+    '华': 'maimai でらっくす PLUS',
+    '爽': 'maimai でらっくす Splash',
+    '煌': 'maimai でらっくす Splash PLUS',
+    '宙': 'maimai でらっくす UNiVERSE',
+    '星': 'maimai でらっくす UNiVERSE PLUS',
+    '祭': 'maimai でらっくす FESTiVAL',
+    '祝': 'maimai でらっくす FESTiVAL PLUS'
+}
+
+def mai_api_get(gamertag: str, plate: list = None, b50: bool = False):
     j = {
         'username': gamertag,
     }
     if b50:
         j['b50'] = True
+        j['mode'] = 'player'
+    elif plate:
+        j['version'] = plate
+        j['mode'] = 'plate'
+    url = f"https://www.diving-fish.com/api/maimaidxprober/query/{j['mode']}"
 
     resp = requests.post(url,json = j)
     # print(resp)
@@ -52,7 +92,7 @@ def mai_api_get(gamertag: str, b50: bool = False,mode: str = 'player'):
 
     return data
 
-def process_record(playrecord: dict):
+def mai_process_record(playrecord: dict):
     title = playrecord['title']
     level = playrecord['level_label']
     diff = playrecord['level_index']
@@ -69,42 +109,261 @@ def process_record(playrecord: dict):
     star = dxscore_2_star(racc,song_id,diff)
     return [title,level,diff,song_id,chart_const,chart_type,acc,racc,star,rate,rating,fc,fs]
 
+def mai_plate_status(gamertag,datalist):
+    # Translate phrase to plate plan
+    versions,plan = mai_phrase_2_plate(datalist[0])
+    # No such plate or plan exists
+    if (versions,plan) == (-1,-1):
+        return f"不存在该名牌版: {datalist[0]}"
+
+    usr_data = mai_api_get(gamertag, plate = versions)
+    # Getting Data Failed
+    if isinstance(usr_data,str):
+        return usr_data
+
+    usr_plate_data = usr_data['verlist']
+
+    # Check Remaining Songs
+    remaining, remaining_hard = mai_plate_check(usr_plate_data,versions,plan)
+
+    remaining_bas_cnt = len(remaining[0])
+    remaining_adv_cnt = len(remaining[1])
+    remaining_exp_cnt = len(remaining[2])
+    remaining_mas_cnt = len(remaining[3])
+    remaining_rem_cnt = len(remaining[4])
+    remaining_cnt_list = [remaining_bas_cnt,remaining_adv_cnt,\
+                        remaining_exp_cnt,remaining_mas_cnt,remaining_rem_cnt]
+
+    # Calculate the Total Remaining Cnt
+    total_remaining_cnt = sum(remaining_cnt_list[:-1])
+
+    # Include Re:Master or Not
+    include_rem = (datalist[0][0] in ['舞','霸'])
+    if include_rem:
+        total_remaining_cnt += remaining_rem_cnt
+
+    plate_states = ["未确认","已确认","已完成"]
+
+    # User Plate Completion Status
+    if total_remaining_cnt == 0:
+        plate_state_id = 2
+    elif remaining_mas_cnt == 0:
+        plate_state_id = 1
+    else:
+        plate_state_id = 0
+
+    reply_txt = f"{gamertag} - 名牌版『{datalist[0]}』\n"
+    reply_txt += f"{plate_states[plate_state_id]}\n"
+
+    # Plate Not Completed
+    if plate_state_id == 0:
+        for i in range(0,4):
+            reply_txt += f"- {diffs[i]}难度剩余{remaining_cnt_list[i]}张谱面\n"
+        if include_rem:
+            reply_txt += f"- {diffs[4]}难度剩余{remaining_cnt_list[i]}张谱面\n"
+        reply_txt += f"- 总计: {total_remaining_cnt}张谱面\n"
+
+        # List Remaining 5 Hard Songs
+        final_remaining_hard = []
+        if not include_rem:
+            for song in remaining_hard:
+                if song[2] != diffs[4]:
+                    final_remaining_hard.append(song)
+        else:
+            final_remaining_hard = remaining_hard
+
+        hard_song_num = min(5,len(final_remaining_hard))
+        reply_txt += f"13+以上谱面{hard_song_num}选:\n"
+        for k in range(hard_song_num):
+            remaining_hard_song = final_remaining_hard[k]
+            s_id = remaining_hard_song[0]
+            s_title = remaining_hard_song[1]
+            s_diff = remaining_hard_song[2]
+            s_ds = remaining_hard_song[3]
+            reply_txt += f"[{s_diff} {s_ds}] {s_title} (ID: {s_id})\n"
+
+    # Plate is Confirmed
+    elif plate_state_id == 1:
+        for i in range(0,3):
+            reply_txt += f"- {diffs[i]}难度剩余{remaining_cnt_list[i]}张谱面\n"
+            reply_txt += f"- 总共: {total_remaining_cnt}张谱面\n"
+
+    # Plate is Completed
+    else:
+        reply_txt += "祝贺！"
+
+    return reply_txt
+
+def mai_plate_check(usr_plate_data:list,versions: list,plan:int):
+    '''
+    plan对照
+    0: 极    1: 将
+    2: 神    3: 舞舞
+    4: 霸者
+    '''
+    # Load Songs Locally
+    mai_songs = mai_music_get(local = True)
+
+    # Initialize Lists to track Remaining / Played
+    remain_bas = []
+    remain_adv = []
+    remain_exp = []
+    remain_mas = []
+    remain_rem = []
+    remaining = [remain_bas,remain_adv,remain_exp,remain_mas,remain_rem]
+    remaining_hard = []
+
+    played_bas = []
+    played_adv = []
+    played_exp = []
+    played_mas = []
+    played_rem = []
+    played = [played_bas, played_adv, played_exp, played_mas, played_rem]
+
+    # Switch Structure for qualification standards
+    check_item = ['fc','achievements','fc','fs','achievements']
+    item_2_check = check_item[plan]
+
+    # Checking each record in usr_plate_data
+    for record in usr_plate_data:
+        song_id = record['id']
+        chart_diff = record['level_index']
+        chart_level = record['level']
+
+        played[chart_diff].append(song_id)
+
+        qualify_item = record[item_2_check]
+        # Didn't pass check, add to remaining
+        if mai_plate_item_check(qualify_item,plan) == False:
+            remaining[chart_diff].append(song_id)
+
+    # Check for Remaining Songs
+    for song in mai_songs:
+        song_version = song['basic_info']['from']
+        if song_version in versions:
+            song_id = int(song['id'])
+            # Skip ジングルベル
+            if song_id == 70:
+                continue
+            song_title = song['title']
+            # Check all diffs for this song
+            diff_cnt = 0
+            for ds in song['ds']:
+                if song_id in remaining[diff_cnt]:
+                    if ds > 13.6:
+                        remaining_hard.append((song_id,song_title,\
+                                                diffs[diff_cnt], ds))
+                if song_id not in played[diff_cnt]:
+                    remaining[diff_cnt].append(song_id)
+                    if ds > 13.6:
+                        remaining_hard.append((song_id,song_title,\
+                                                diffs[diff_cnt], ds))
+                diff_cnt += 1
+
+    remaining_hard = sorted(remaining_hard, key = lambda i: i[3],\
+                            reverse = True)
+    return remaining,remaining_hard
+
+def mai_plate_item_check(item, plan:int)-> bool:
+    # 极
+    if plan == 0:
+        return item in ['fc', 'fcp','ap','app']
+    # 将
+    elif plan == 1:
+        return item > 100.0
+    # 神
+    elif plan == 2:
+        return item in ['ap', 'app']
+    # 舞舞
+    elif plan == 3:
+        return item in ['fsd', 'fsdp']
+    # Clear
+    elif plan == 4:
+        return item > 80.0
+
+def mai_phrase_2_plate(phrase: str) -> (list,str):
+    ver = phrase[0]
+    plan = phrase[1:]
+    # Process Version
+    if ver in ['霸', '舞']:
+        version = list(set(_v for _v in list(PLATE_2_VER.values())[:-9]))
+    elif ver == '真':
+        version = list(set(_v for _v in list(PLATE_2_VER.values())[0:2]))
+    elif ver == '星':
+        version = [PLATE_2_VER['宙']]
+    elif ver == '祝':
+        version = [PLATE_2_VER['祭']]
+    else:
+        version = [PLATE_2_VER.get(ver,-1)]
+        if version == [-1]:
+            return (-1,-1)
+
+    # Process Plan
+    if plan in ['極', '极']:
+        plan_num = 0
+    elif plan == '将':
+        # No such plate
+        if ver == '真':
+            return (-1,-1)
+        plan_num = 1
+    elif plan == '神':
+        plan_num = 2
+    elif plan == '舞舞':
+        plan_num = 3
+    elif plan == '者' and ver == '霸':
+        plan_num = 4
+    else:
+        return (-1,-1)
+
+    return (version,plan_num)
+
 def mai_music_get(local: bool = False):
     if local:
-        with open(os.path.join(static, 'music_data.json'), 'r', encoding='utf-8') as f:
-            songs = json.loads(f.read())
-        with open(os.path.join(static, 'chart_stats.json'), 'r', encoding='utf-8') as f:
-            stats = json.loads(f.read())
-        return songs,stats
-
-    # SONG DETAILS
-    resp = requests.get('https://www.diving-fish.com/api/maimaidxprober/music_data')
-    # print(resp.status_code)
-
-    if resp.status_code != 200:
-        output('maimaiDX曲目数据获取失败,切换至本地暂存文件','WARNING',background = 'WHITE')
-        with open(os.path.join(static, 'music_data.json'), 'r', encoding='utf-8') as f:
+        with open(os.path.join(static, 'music_data.json'), 'r', \
+                encoding='utf-8') as f:
             songs = json.loads(f.read())
     else:
-        songs = resp.json()
-        with open(os.path.join(static, 'music_data.json'), 'w', encoding='utf-8') as f:
-            f.write(json.dumps(songs, ensure_ascii=False, indent=4))
+        # SONG DETAILS
+        resp = requests.get(\
+                'https://www.diving-fish.com/api/maimaidxprober/music_data')
+        if resp.status_code != 200:
+            output('maimaiDX曲目数据获取失败,切换至本地暂存文件',\
+                    'WARNING',background = 'WHITE')
+            with open(os.path.join(static, 'music_data.json'), 'r', \
+                    encoding='utf-8') as f:
+                songs = json.loads(f.read())
+        else:
+            songs = resp.json()
+            with open(os.path.join(static, 'music_data.json'), 'w', \
+                    encoding='utf-8') as f:
+                f.write(json.dumps(songs, ensure_ascii=False, indent=4))
+    return songs
 
-    # CHART DETAILS
-    resp = requests.get('https://www.diving-fish.com/api/maimaidxprober/chart_stats')
-    if resp.status_code != 200:
-        output('maimaiDX谱面数据获取失败,切换至本地暂存文件','WARNING',background = 'WHITE')
-        with open(os.path.join(static, 'chart_stats.json'), 'r', encoding='utf-8') as f:
+def mai_chartstats_get(local: bool = False):
+    if local:
+        with open(os.path.join(static, 'chart_stats.json'), 'r', \
+                encoding='utf-8') as f:
             stats = json.loads(f.read())
     else:
-        stats = resp.json()
-        with open(os.path.join(static, 'chart_stats.json'), 'w', encoding='utf-8') as f:
-            f.write(json.dumps(stats, ensure_ascii=False, indent=4))
-    return songs,stats
+        # CHART DETAILS
+        resp = requests.get(\
+                'https://www.diving-fish.com/api/maimaidxprober/chart_stats')
+        if resp.status_code != 200:
+            output('maimaiDX谱面数据获取失败,切换至本地暂存文件',\
+                    'WARNING',background = 'WHITE')
+            with open(os.path.join(static, 'chart_stats.json'), 'r', \
+                    encoding='utf-8') as f:
+                stats = json.loads(f.read())
+        else:
+            stats = resp.json()
+            with open(os.path.join(static, 'chart_stats.json'), 'w', \
+                    encoding='utf-8') as f:
+                f.write(json.dumps(stats, ensure_ascii=False, indent=4))
+    return stats
 
 def mai_music_search(datalist,callerid,roomid = None):
     # 载入数据
-    mai_songs = mai_music_get(local = True)[0]
+    mai_songs = mai_music_get(local = True)
 
     results = []
     # Fuzzy text search
@@ -167,14 +426,14 @@ def mai_music_search(datalist,callerid,roomid = None):
     return [reply_txt]
 
 def mai_music_by_id(song_id: int):
-    songs = mai_music_get(True)[0]
+    songs = mai_music_get(True)
     for s in songs:
         if s["id"] == str(song_id):
             return s
     return -1
 
 def mai_music_by_title(title: str):
-    songs = mai_music_get(True)[0]
+    songs = mai_music_get(True)
     for s in songs:
         if s["title"] == title:
             return s
@@ -186,10 +445,10 @@ def mai_music_by_alias(alias: str):
 def mai_music_random(datalist,callerid,roomid = None):
     # If no diff specified, random over the whole collection
     if len(datalist) == 0:
-        songs = mai_music_get(True)[0]
+        songs = mai_music_get(True)
     # If a number of diffs are specified
     else:
-        collection = mai_music_get(True)[0]
+        collection = mai_music_get(True)
         songs = []
         for s in collection:
             for diff in s['level']:
@@ -204,7 +463,7 @@ def mai_music_random(datalist,callerid,roomid = None):
     return [reply_txt]
 
 def mai_music_new(datalist,callerid,roomid = None):
-    songs = mai_music_get(local = False)[0]
+    songs = mai_music_get(local = False)
     reply_txt = "当前CN最新版本歌曲列表:\n"
     has_new = False
     for s in songs:
@@ -216,7 +475,7 @@ def mai_music_new(datalist,callerid,roomid = None):
     else:
         return ['当前还没有新歌。']
 
-def mai_alias_get(mode: str = 'all',params: dict = None, local: bool = False):
+def mai_alias_get(mode: str = 'all',params: dict = None,local: bool = False):
     """
     - `all`: 所有曲目的别名
     - `songs`: 该别名的曲目
@@ -230,7 +489,7 @@ def mai_alias_get(mode: str = 'all',params: dict = None, local: bool = False):
         return data
 
     try:
-        resp = requests.get(f'https://api.yuzuai.xyz/maimaidx/{ALIAS[mode]}',params = params)
+        resp = requests.get(f'https://api.yuzuai.xyz/maimaidx/{API_ALIAS[mode]}',params = params)
 
         if resp.status_code != 200:
             output('maimaiDX歌曲别名数据获取失败,切换为本地暂存文件','WARNING',background = 'WHITE')
@@ -277,12 +536,20 @@ def mai_alias_search(datalist,callerid,roomid = None):
 
 def mai_update(datalist,callerid,roomid = None):
     resp = "更新结果:\n"
-    mai_music_get()
-    resp += "曲目:ok\n"
+    m_c_err = False
+    try:
+        mai_music_get()
+        mai_chartstats_get()
+    except Exception as e:
+        m_c_err = True
+        resp += "曲目&谱面: ERROR\n"
+    if not m_c_err:
+        resp += "曲目&谱面: OK\n"
+
     if mai_alias_get() == -1:
-        resp += "别名:错误"
+        resp += "别名: 错误"
     else:
-        resp += "别名:ok"
+        resp += "别名: OK"
     return [resp]
 
 ######## Best Image Drawing ########
@@ -551,7 +818,7 @@ def best_2_image(output: Image.Image,data: list,isOld: bool):
                 x += 416
 
         # 结构: [title,level,diff,song_id,chart_const,chart_type,acc,racc,star,rate,rating,fc,fs]
-        info = process_record(s)
+        info = mai_process_record(s)
 
         # Used to use 4 digit ids. Depreciated
         ## songid = get_cover_len4_id(info[3])
@@ -611,8 +878,8 @@ def best_2_image(output: Image.Image,data: list,isOld: bool):
 
     return output
 
-def draw_best_image(gamertag: str, b50: bool):
-    user_data = mai_api_get(gamertag,True)
+def draw_best_image(gamertag: str):
+    user_data = mai_api_get(gamertag,b50 = True)
 
     if user_data == -2:
         return -2
@@ -638,10 +905,13 @@ def draw_best_image(gamertag: str, b50: bool):
 
     # Load Assets
     logo = Image.open(os.path.join(mai_dir, 'logo.png')).resize((378, 172))
-    dx_rating = Image.open(os.path.join(mai_dir, rating_picture(ra+add_ra,b50))).resize((425, 80))
+    dx_rating = Image.open(os.path.join(mai_dir, \
+                    rating_picture(ra+add_ra,b50 = True))).resize((425, 80))
     Name = Image.open(os.path.join(mai_dir, 'Name.png'))
-    MatchLevel = Image.open(os.path.join(mai_dir, friend_match_picture(add_ra))).resize((134, 55) if b50 else (128, 58))
-    rating = Image.open(os.path.join(mai_dir, 'UI_CMN_Shougou_Rainbow.png')).resize((454, 50))
+    MatchLevel = Image.open(os.path.join(mai_dir, \
+                            friend_match_picture(add_ra))).resize((128, 58))
+    rating = Image.open(os.path.join(mai_dir,\
+                            'UI_CMN_Shougou_Rainbow.png')).resize((454, 50))
 
     ### Generate Best Image ###
     im = Image.open(os.path.join(mai_dir,'b40_bg.png')).convert('RGBA')
@@ -649,9 +919,11 @@ def draw_best_image(gamertag: str, b50: bool):
 
     # If user achieved any plates
     if plate:
-        plate = Image.open(os.path.join(mai_dir, f'{plate}.png')).resize((1420, 230))
+        plate = Image.open(os.path.join(mai_dir, \
+                                        f'{plate}.png')).resize((1420, 230))
     else:
-        plate = Image.open(os.path.join(mai_dir, 'UI_Plate_300101.png')).resize((1420, 230))
+        plate = Image.open(os.path.join(mai_dir, \
+                                'UI_Plate_300101.png')).resize((1420, 230))
     # Draw Plate
     im.alpha_composite(plate, (390, 100))
 
@@ -678,7 +950,7 @@ def draw_best_image(gamertag: str, b50: bool):
     text_im.text((635,235),nickname.upper(),font=_tb,fill =(0,0,0,255),anchor = 'lm')
 
     # Write Split Rating
-    text_im.text((847, 300), f'底分：{ra} + 段位分：{add_ra}' if not b50 else 'New Rating System', font=_siyuan, fill= (0, 0, 0, 255),anchor = 'mm')
+    text_im.text((847, 300),'New Rating System', font=_siyuan, fill= (0, 0, 0, 255),anchor = 'mm')
 
     # Write Credits
     text_im.text((900, 2365), 'Generated by WINDBOT | Assets&Design by Yuri-YuzuChaN & BlueDeer233', font = _tb, fill = (103, 20, 141, 255), anchor = 'mm')
