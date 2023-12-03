@@ -101,7 +101,7 @@ undisturbed_hb = 0
 global_event_tick = 0
 
 '''Admins'''
-OP_LIST = ['wxid_xd4gc9mu3stx12']
+OP_LIST = [YOUR_WX_ID]
 
 '''Local Resource Path'''
 project_path = os.path.join(os.path.dirname(__file__))
@@ -356,7 +356,6 @@ def handle_chat_nick(j):
 
 	sql_update(conn,f'r{roomid[:-9]}','groupUsrName',nickname,\
 				f"wxid = '{wxid}'")
-	# output(f'nickname:{nickname}')
 
 def get_chatroom_memberlist(roomid = 'null'):
 	qs={
@@ -764,6 +763,7 @@ def execute_call(func_name, real_data, callerid, destination):
 	THREADED_FUNC_DICT = {
 		"gosen": gen_5000, # Thank you Kevin
 		"mb50": mai_best,
+		"mplate": mai_plate,
 		"pjskev": pjsk_curr_event,
 		"whatanime": anime_by_url,
 		"cmd": cmd_trigger
@@ -809,7 +809,7 @@ def handle_recv_msg(msgJson):
 	# output(msgJson)
 
 	isCite = False
-	# if msg is a cite message
+	# If msg is a cite message
 	if msgJson.get('refnick',-1) != -1 and \
 		msgJson.get('refcontent',-1) != -1:
 		isCite = True
@@ -840,7 +840,6 @@ def handle_recv_msg(msgJson):
 				refcontent = refcontent[4]
 			else:
 				refcontent = refcontent[0]
-
 			output(f"{roomname}-{nickname}: {keyword}\n\
 				「-> {msgJson['refnick']} : {refcontent}",\
 				'GROUPCHAT')
@@ -901,19 +900,19 @@ def handle_recv_msg(msgJson):
 							wxid = msgJson['wxid']))
 
 def Q2B(uchar):
-    """单个字符 全角转半角"""
-    inside_code = ord(uchar)
-    if inside_code == 0x3000:
-        inside_code = 0x0020
-    else:
-        inside_code -= 0xfee0
-    if inside_code < 0x0020 or inside_code > 0x7e: #转完之后不是半角字符返回原来的字符
-        return uchar
-    return chr(inside_code)
+	"""单个字符 全角转半角"""
+	inside_code = ord(uchar)
+	if inside_code == 0x3000:
+		inside_code = 0x0020
+	else:
+		inside_code -= 0xfee0
+	if inside_code < 0x0020 or inside_code > 0x7e: #转完之后不是半角字符返回原来的字符
+		return uchar
+	return chr(inside_code)
 
 def stringQ2B(ustring):
-    """把字符串全角转半角"""
-    return "".join([Q2B(uchar) for uchar in ustring])
+	"""把字符串全角转半角"""
+	return "".join([Q2B(uchar) for uchar in ustring])
 
 ######################### ON MSG SWITCH #####################################
 def on_localapi_message(ws,message):
@@ -1056,21 +1055,21 @@ def constable(datalist,callerid,roomid = None):
 
 #-----PJSK-----
 def pjsk_curr_event(datalist,callerid,roomid = None):
-    event_type_dict = {
-        '普活': 'marathon', '马拉松': 'marathon', 'marathon': 'marathon',
-        '5v5': 'cheerful_carnival', '嘉年华': 'cheerful_carnival', 'cheerful_carnival': 'cheerful_carnival'
-    }
-    event_type_dict = {'marathon': '普活','cheerful_carnival': '5v5嘉年华'}
-    unit_dict = {
-        'light_sound': 'Leo/need', 'idol': 'More More Jump', \
-        'street': 'Vivid Bad Squad','theme_park': 'Wonderlands x Showtime',\
-        'school_refusal': '25时', 'none': '未指明不知道是哪个团但是感觉会很开心的'
-    }
-    data = pjsk_event_get(local = False)[0]
-    event = load_event_info(data)
-    end_text = '(进行中)' if event[-1] else '(已结束)'
-    reply_txt = f'{unit_dict[event[4]]}活动！\n「{event[1]}」\n类型: {event_type_dict[event[3]]}\n结束时间: {event[2]} {end_text}'
-    ws.send(send_txt_msg(reply_txt,roomid))
+	event_type_dict = {
+		'普活': 'marathon', '马拉松': 'marathon', 'marathon': 'marathon',
+		'5v5': 'cheerful_carnival', '嘉年华': 'cheerful_carnival', 'cheerful_carnival': 'cheerful_carnival'
+	}
+	event_type_dict = {'marathon': '普活','cheerful_carnival': '5v5嘉年华'}
+	unit_dict = {
+		'light_sound': 'Leo/need', 'idol': 'More More Jump', \
+		'street': 'Vivid Bad Squad','theme_park': 'Wonderlands x Showtime',\
+		'school_refusal': '25时', 'none': '未指明不知道是哪个团但是感觉会很开心的'
+	}
+	data = pjsk_event_get(local = False)[0]
+	event = load_event_info(data)
+	end_text = '(进行中)' if event[-1] else '(已结束)'
+	reply_txt = f'{unit_dict[event[4]]}活动！\n「{event[1]}」\n类型: {event_type_dict[event[3]]}\n结束时间: {event[2]} {end_text}'
+	ws.send(send_txt_msg(reply_txt,roomid))
 
 #-----ANIME-----
 def anime_by_url(datalist,callerid,roomid):
@@ -1127,7 +1126,8 @@ def mai_best(datalist,callerid,roomid = None):
 	if datalist != []:
 		gamertag = datalist[0]
 	else:
-		gamertag = sql_fetch(cur_thread,'Users',['maiID'],f"wxid = '{callerid}'")[0][0]
+		gamertag = sql_fetch(cur_thread,'Users',['maiID'],\
+							f"wxid = '{callerid}'")[0][0]
 		if gamertag == '-1':
 			ws.send(send_txt_msg('您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: @WindBot bind mai xxxxx',roomid))
 			return
@@ -1147,6 +1147,25 @@ def mai_best(datalist,callerid,roomid = None):
 	store_path = os.path.join(os.path.join(resource_path,'maiCN'),'MaiBest')
 	image = image.save(os.path.join(store_path,f'{gamertag}.png'))
 	ws.send(send_attatch(os.path.join(store_path,f'{gamertag}.png'),roomid))
+
+def mai_plate(datalist,callerid,roomid = None):
+	conn_thread = sqlite3.connect('./windbotDB.db')
+	cur_thread = conn_thread.cursor()
+	# User need to specify which plate to check
+	if not datalist:
+		ws.send(send_txt_msg('请提供要查询的名牌版。',roomid))
+		return
+
+	# User can only check their plate progress
+	gamertag = sql_fetch(cur_thread,'Users',['maiID'],\
+						f"wxid = '{callerid}'")[0][0]
+	if gamertag == '-1':
+		ws.send(send_txt_msg('您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: @WindBot bind mai xxxxx',roomid))
+		return
+
+	reply_txt = mai_plate_status(gamertag, datalist)
+	ws.send(send_txt_msg(reply_txt,roomid))
+	return
 
 #-----RSS-----
 def test_rss_wrapper(datalist,callerid,roomid = None):
@@ -1359,7 +1378,7 @@ def feedback(datalist,callerid,roomid = None):
 		ws.send(send_txt_msg(msg,handler))
 		return ['发送完成']
 
-def system_battery_status():
+def sys_battery_status():
 	cmd = "WMIC Path Win32_Battery Get BatteryStatus"
 	datalist = cmd.split(" ")
 	result = execute_cmd(datalist).strip().split("\n")
@@ -1395,7 +1414,7 @@ def system_battery_status():
 	return (btry_status, btry_description)
 
 def btry_check_auto():
-	status, description = system_battery_status()
+	status, description = sys_battery_status()
 	if status == 0:
 		ws.send(send_txt_msg("[警告] 机器目前电池情况: {description}"),OP_LIST[0])
 		output(f"DISCHARGING BATTERY - {description}",\
@@ -1409,7 +1428,7 @@ def btry_check_trigger(datalist,callerid,roomid = None):
 	if caller_level[0][0] < 3:
 		ws.send(send_txt_msg('您的权限不足。',roomid))
 		return
-	status, description = system_battery_status()
+	status, description = sys_battery_status()
 	status_str = ["DISCHARGING", "Charging", "Full", "Unknown" ,"No Battery"]
 	reply_txt = f"Battery Status: {status_str[status]}\n{description}"
 	return [reply_txt]
