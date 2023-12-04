@@ -43,6 +43,14 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 <details>
   <summary>点我展开 Click To Expand</summary>
 
+  - 2023.12.4
+    - 修复功能: mplate
+      - 修复了名牌版确定后会多次出现总共计数的问题
+      - 解决了Re:Master计数出错的问题
+      - 华&煌系列的国服特性已经正确显示
+  - 2023.12.3
+    - 新增功能:
+      - mplate <plate> maimai名牌版进度查询 (Diving-Fish数据源)
   - 2023.12.1
     - 改善了功能呼叫结构
     - 新增功能:
