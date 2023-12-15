@@ -86,9 +86,9 @@ def check_rss(route:str,usrID:str = None):
 		else:
 			return -1
 
-def get_image(url:str,route:str,id:int):
+def get_image(url:str,route:str,pic_id:int):
 	data = requests.get(url).content
-	pic_loc = os.path.join(pic_cache_dir,f"{route}img{id}.jpg")
+	pic_loc = os.path.join(pic_cache_dir,f"{route}img{pic_id}.jpg")
 	f = open(pic_loc,'wb')
 	f.write(data)
 	f.close()

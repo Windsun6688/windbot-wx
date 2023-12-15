@@ -23,19 +23,20 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
   <summary>主要功能 Main Features</summary>
 
 - **Arcaea相关**: 查询歌曲信息，查询谱面信息，查询别名，获取指定定数所有曲目，定数表，随机曲目
-- **maimaiDX相关**: 查询歌曲&谱面信息，查询别名，best50图片生成，随机曲目，新歌列表
+- **maimaiDX相关**: 查询歌曲&谱面信息，查询别名，best50图片生成，随机曲目，新歌列表，牌子查询
 - **pjsk相关**: 查询当前活动信息，查询个人FC/AP数据，查询皆传进度，查询别名
   
+
 </details>
 
 <details>
   <summary>其他功能 Other Features</summary>
-  
+
   - 我想要五千兆系图片生成
   - 动画截图溯源
-  - 拍一拍反馈
+  - 拍一拍执行命令
   - RSS订阅推送
-  
+
 </details>
 
 ## :card_file_box: 开发日志 Develop Log
@@ -43,18 +44,40 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 <details>
   <summary>点我展开 Click To Expand</summary>
 
+  - 2023.12.15
+    
+    
+    - 修复功能:
+    
+        - PatAction可以连环绑定的问题
+        - 使用设定为patstat的PatAction对群组造成侵入性影响的问题
+    
+  - 2023.12.13
+
+
+    - WindBot一周年！
+    - 新增功能:
+
+        - PatAction 拍一拍WB执行预设定命令
+        - 使用“WB"呼出WindBot
+        - listfunc 展示所有可用命令
+
   - 2023.12.4
+
     - 修复功能: mplate
       - 修复了名牌版确定后会多次出现总共计数的问题
       - 解决了Re:Master计数出错的问题
       - 华&煌系列的国服特性已经正确显示
+
   - 2023.12.3
     - 新增功能:
       - mplate <plate> maimai名牌版进度查询 (Diving-Fish数据源)
+
   - 2023.12.1
     - 改善了功能呼叫结构
     - 新增功能:
       - 机器电池检测功能，失去墙插自动提醒管理员
+
   - 2023.11.25
     - 修复了rss推送功能的
       ```
@@ -62,22 +85,26 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
       这       
       Link: 问
       ```
+
   - 2023.10.18
     - 修复功能: pjskpf, amikaiden
     - 新增功能:
       - pwhat [alias] pjsk别名库
       - pinfo [ID | Title] pjsk歌曲信息
       - pcinfo [ID] pjsk谱面信息
+
   - 2023.9.14
     - 修复rss推送会重复推送，动态删除导致不再判断刷新的问题
+
   - 2023.9.11
     - 增加rss推送功能
     - 新增randmai函数 随机抽取maimai歌曲
     - 新增mnew函数 显示当前maimai版本所有歌曲
     - 修复拍一拍相关
+
   - 2023.08.20
     - 适配wxAPI更新，wx版本更新至至3.9.2.23
-  
+
 </details>
 
 ## :gift_heart: 特别感谢 Thanks
