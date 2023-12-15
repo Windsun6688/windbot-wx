@@ -2,6 +2,7 @@
 
 import websocket,json,requests,rel,sqlite3,subprocess
 import random,traceback
+import sys
 from datetime import datetime
 from pytz import timezone
 from threading import Thread
@@ -16,96 +17,64 @@ from Functions.rss.rssPush import *
 websocket._logging._logger.level = -99
 init(autoreset = True)
 
-ip='127.0.0.1'
-port=5555
-
-SERVER=f'ws://{ip}:{port}'
-HEART_BEAT=5005
-RECV_TXT_MSG=1
-RECV_TXT_CITE_MSG=49
-RECV_PIC_MSG=3
-USER_LIST=5000
-GET_USER_LIST_SUCCSESS=5001
-GET_USER_LIST_FAIL=5002
-TXT_MSG=555
-PIC_MSG=500
-AT_MSG=550
-CHATROOM_MEMBER=5010
-CHATROOM_MEMBER_NICK=5020
-PERSONAL_INFO=6500
-DEBUG_SWITCH=6000
-PERSONAL_DETAIL=6550
-DESTROY_ALL=9999
-STATUS_MSG=10000
-ATTATCH_FILE = 5003
-# 'type':49 带引用的消息
-
-ANIME_QUERY = """
-query ($id: Int, $idMal:Int, $search: String) {
-	Media (id: $id, idMal: $idMal, search: $search, type: ANIME) {
-		id
-		idMal
-		title {
-			romaji
-			english
-			native
-		}
-		format
-		status
-		episodes
-		duration
-		countryOfOrigin
-		source (version: 2)
-		trailer {
-			id
-			site
-		}
-		genres
-		tags {
-			name
-		}
-		averageScore
-		relations {
-			edges {
-				node {
-					title {
-						romaji
-						english
-					}
-					id
-					type
-				}
-				relationType
-			}
-		}
-		nextAiringEpisode {
-			timeUntilAiring
-			episode
-		}
-		isAdult
-		isFavourite
-		mediaListEntry {
-			status
-			score
-			id
-		}
-		siteUrl
-	}
-}
-"""
-
 '''Initialize Autohibernate'''
 undisturbed_hb = 0
 
 '''Initialize TickScheduler'''
 global_event_tick = 0
 
-'''Admins'''
-OP_LIST = [YOUR_WX_ID]
-
 '''Local Resource Path'''
 project_path = os.path.join(os.path.dirname(__file__))
-resource_path = os.path.join(os.path.dirname(__file__),'Resources')
+resource_path = os.path.join(project_path,'Resources')
+
+'''Initialize Bot Config'''
+try:
+	wb_config_path = os.path.join(project_path,'config.json')
+	json.load(open(wb_config_path))
+except FileNotFoundError:
+	# Generate WB config file
+	with open(wb_config_path, 'w', encoding = 'utf-8') as f:
+		init_config = { "botName": "YOUR TRIGGER FOR GROUPCHAT",
+						"botDMTrigger": "YOUR TRIGGER FOR DM",
+						"Sudoers": ["YOUR WXID"],
+						"wxIP": "127.0.0.1",
+						"wxPort": "5555"}
+		f.write(json.dumps(init_config,ensure_ascii = False, indent = 4))
+	print("Assuming running for the first time. Generating WB Config")
+	time.sleep(5)
+	sys.exit()
+
+'''WindBot Config'''
+wb_config = json.load(open(wb_config_path))
+BOT_NAME = wb_config["botName"]
+BOT_GC_TRIGGER = f"@{BOT_NAME}"
+BOT_DM_TRIGGER = wb_config["botDMTrigger"]
+SUDO_LIST = wb_config["Sudoers"]
+
+FUNTOOL_IP = wb_config["wxIP"]
+FUNTOOL_PORT = wb_config["wxPort"]
+
+'''Msg Codes'''
+SERVER = f"ws://{FUNTOOL_IP}:{FUNTOOL_PORT}"
+HEART_BEAT = 5005
+RECV_TXT_MSG = 1
+RECV_TXT_CITE_MSG = 49
+RECV_PIC_MSG = 3
+USER_LIST = 5000
+GET_USER_LIST_SUCCSESS = 5001
+GET_USER_LIST_FAIL = 5002
+TXT_MSG = 555
+PIC_MSG = 500
+AT_MSG = 550
+CHATROOM_MEMBER = 5010
+CHATROOM_MEMBER_NICK = 5020
+PERSONAL_INFO = 6500
+DEBUG_SWITCH = 6000
+PERSONAL_DETAIL = 6550
+DESTROY_ALL = 9999
+STATUS_MSG = 10000
+ATTATCH_FILE = 5003
+# 'type':49 带引用的消息
 
 '''Recent Logs List'''
 latest_logs = []
@@ -148,11 +117,13 @@ def output(msg,logtype = 'SYSTEM',mode = 'DEFAULT',background = 'DEFAULT'):
 	mode = LogMode.get(mode)
 	bg = LogBG.get(background)
 
-	now=time.strftime("%Y-%m-%d %X")
+	now = time.strftime("%Y-%m-%d %X")
 
 	# Shorten logs of too long messages
-	if repr(msg).count('\n') > 7 and logtype != 'ERROR':
-		msg = "\n".join(msg.split("\n")[:5])
+
+	line_cnt = msg.count('\n') + 1
+	if line_cnt > 10 and logtype != 'ERROR':
+		msg = "\n".join(msg.split("\n")[:10])
 		msg += '\n......'
 	print(f"[{now} \033[{mode};{color}{bg}m{logtype}\033[0m] {msg}")
 
@@ -169,7 +140,6 @@ def output(msg,logtype = 'SYSTEM',mode = 'DEFAULT',background = 'DEFAULT'):
 		latest_logs.append(f"[{now} {logtype}] {msg}")
 
 	# print("["+f"{color}[1;35m{LogType}{color}[0m"+"]"+' Success')
-	# print(f'[{now}]:{msg}')
 
 def sql_insert(db,dbcur,\
 			table: str,\
@@ -225,7 +195,9 @@ def sql_update(db, table: str, col: str, value: str, condition: str = None):
 	db.execute(update_txt)
 	db.commit()
 
-def sql_fetch(dbcur, table: str, cols: list = ['*'], condition: str = None):
+def sql_fetch(dbcur, table: str, cols: list = None, condition: str = None):
+	if not cols:
+		cols = ['*']
 	cols = str(cols)[1:-1].replace('\'','')
 
 	if condition:
@@ -476,10 +448,14 @@ def heartbeat_trigger(msgJson):
 	elif undisturbed_hb == 5:
 		output('Undisturbed in 5 min. Hiding heartbeat logs. zZZ',logtype = 'HEART_BEAT',mode = 'HIGHLIGHT')
 
+	# Every 60 min, Trigger a User Database Refresh
+	if global_event_tick % 60 == 0 and global_event_tick != 0:
+		ws.send(send_wxuser_list())
+		global_event_tick = 0
+
 	# Every 30 min, Trigger a rss fetch
 	if global_event_tick % 30 == 0 and global_event_tick != 0:
 		tRss = Thread(target = rss_trigger, args = ())
-		global_event_tick = 0
 		tRss.start()
 
 	# Every 15 min, Trigger a battery check
@@ -492,11 +468,11 @@ def on_open(ws):
 	ws.send(send_wxuser_list())
 
 	# Update Global Admin List
-	for wxid in OP_LIST:
+	for wxid in SUDO_LIST:
 		sql_update(conn,'Users','powerLevel',3,f"wxid = '{wxid}'")
 
 	now=time.strftime("%Y-%m-%d %X")
-	ws.send(send_txt_msg(f'启动完成\n{now}',OP_LIST[0]))
+	ws.send(send_txt_msg(f'启动完成\n{now}',SUDO_LIST[0]))
 
 	# ASCII Art Credit: FigLet & Me
 	start_ascii_art = """
@@ -532,6 +508,7 @@ def sql_initialize_users():
 			wxcode TEXT,
 			realUsrName TEXT,
 			patTimes NUMBER NOT NULL DEFAULT 0,
+			patAction TEXT NOT NULL DEFAULT -1,
 			arcID NUMBER NOT NULL DEFAULT -1,
 			qqID NUMBER NOT NULL DEFAULT -1,
 			pjskID NUMBER NOT NULL DEFAULT -1,
@@ -672,7 +649,7 @@ def handle_recv_pic(msgJson):
 		'''
 		output(f'{nickname}: [IMAGE]','DM')
 
-def handle_recv_call(keyword,callerid,destination):
+def handle_recv_call(keyword, callerid, destination):
 	caller_isbanned = sql_fetch(cur,'Users',['banned'],f"wxid = '{callerid}'")
 	if caller_isbanned[0][0] == 1:
 		return
@@ -703,7 +680,8 @@ def handle_recv_call(keyword,callerid,destination):
 		ws.send(send_txt_msg('正在获取',destination))
 
 	elif func_name == 'help':
-		ws.send(send_attatch(f'{resource_path}\\Help\\WindbotHelpGC.jpeg',\
+		help_path = os.path.join(resource_path,"Help")
+		ws.send(send_attatch(os.path.join(help_path,"WindbotHelpGC.jpeg"),\
 				destination))
 		return
 
@@ -711,64 +689,6 @@ def handle_recv_call(keyword,callerid,destination):
 
 # Helper of handle_recv_call
 def execute_call(func_name, real_data, callerid, destination):
-	WB_FUNC_DICT = {
-		'bind': bindID,
-		'patstat': patstat,
-		'fdbk': feedback,
-		'btry': btry_check_trigger,
-
-		'ban': ban,
-		'unban':unban,
-		'refresh': refresh,
-		'setadmin':set_admin,
-		'punch':punch,
-		'setsuper': set_super,
-		'announce': announce,
-		'annswitch': switch_announce,
-		'annview': view_announce,
-		'rssswitch': switch_rss,
-		'rssview': view_rss,
-		# 'testrss': test_rss_wrapper,
-
-		'logs': fetch_logs,
-
-		'ainfo': arc_music_search,
-		'randarc': arc_random,
-		'acinfo': arc_chart_info,
-		'awhat': arc_alias_search,
-		'grablevel': grablevel,
-		'constable': constable,
-		'addalias': addalias,
-
-		'minfo': mai_music_search,
-		'mwhat':mai_alias_search,
-		'mnew': mai_music_new,
-		'randmai': mai_music_random,
-		'mupdate': mai_update,
-
-		'pjskpf': pjskpf,
-		'pwhat': pjsk_alias_search,
-		'pinfo': pjsk_music_search,
-		'pcinfo': pjsk_chart_search,
-		'amikaiden': amIkaiden,
-		'pupdate': pjsk_data_update
-	}
-
-	DEPRECIATED_FUNC_DICT = {
-		"b30": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
-		"arcrecent": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
-		"mb40": "请移步maimai b50。\n指令: mb50"
-	}
-
-	THREADED_FUNC_DICT = {
-		"gosen": gen_5000, # Thank you Kevin
-		"mb50": mai_best,
-		"mplate": mai_plate,
-		"pjskev": pjsk_curr_event,
-		"whatanime": anime_by_url,
-		"cmd": cmd_trigger
-	}
-
 	# Depreciated Functions
 	if func_name in DEPRECIATED_FUNC_DICT:
 		ws.send(send_txt_msg(DEPRECIATED_FUNC_DICT[func_name],destination))
@@ -801,7 +721,8 @@ def execute_call(func_name, real_data, callerid, destination):
 	# Non-Existent Function
 	else:
 		output('Called non-existent function','WARNING',background = 'WHITE')
-		return f"没有该指令: {func_name}"
+		ws.send(send_txt_msg(f"没有该指令: {func_name}",destination))
+		return
 
 def handle_recv_msg(msgJson):
 	global undisturbed_hb
@@ -825,7 +746,7 @@ def handle_recv_msg(msgJson):
 
 		# Handle User Calls
 		keyword=msgJson['content'].replace('\u2005','')
-		if keyword[:8] == '@WindBot':
+		if keyword[:8] == BOT_GC_TRIGGER:
 			output(f'{roomname}-{nickname}: {keyword[8:]}','CALL','HIGHLIGHT')
 			handle_recv_call(keyword[8:],senderid,roomid)
 			return
@@ -853,7 +774,7 @@ def handle_recv_msg(msgJson):
 
 		# Handle User Calls
 		keyword=msgJson['content'].replace('\u2005','')
-		if keyword[:2] == 'WB':
+		if keyword[:2] == BOT_DM_TRIGGER:
 			output(f'{nickname}: {keyword}','CALL','HIGHLIGHT')
 			handle_recv_call(keyword[2:],senderid,senderid)
 			return
@@ -888,16 +809,23 @@ def handle_recv_msg(msgJson):
 	elif keyword == '6':
 		if roomid:
 			ws.send(send_txt_msg('WB很不喜欢单走一个6哦',wxid=msgJson['wxid']))
-			# ban([msgJson['id1']],OP_LIST[0],msgJson['wxid'])
+			# ban([msgJson['id1']],SUDO_LIST[0],msgJson['wxid'])
 	elif keyword == '‎‎':
-		replies = ['‎‎','全ては一つの幸福に集约された。今日という日は人类が真の幸切った辉かしい历史の転换である','U,iNVERSE']
-		ws.send(send_txt_msg(random.choice(replies),wxid=msgJson['wxid']))
+		resp_list = ['‎‎',\
+					'全ては一つの幸福に集约された。今日という日は人类が真の幸切った辉かしい历史の転换である']
+		ws.send(send_txt_msg(random.choice(resp_list),wxid=msgJson['wxid']))
 	elif keyword == '‎':
 		reply_txt = "₂ₓ"
+		ws.send(send_txt_msg(reply_txt, wxid = msgJson['wxid']))
+	elif keyword == '∩':
+		reply_txt = '‎'
 		ws.send(send_txt_msg(reply_txt, wxid = msgJson['wxid']))
 	elif keyword.lower() == 'friday':
 		ws.send(send_txt_msg(today_is_friday_in_california(msgJson['wxid']),\
 							wxid = msgJson['wxid']))
+	elif keyword.lower() == 'wb':
+		resp_list = ["您好!","我可以帮到您些什么?"]
+		ws.send(send_txt_msg(random.choice(resp_list),wxid = msgJson['wxid']))
 
 def Q2B(uchar):
 	"""单个字符 全角转半角"""
@@ -945,52 +873,125 @@ def on_localapi_message(ws,message):
 	action.get(resp_type,print)(j)
 
 ########################## USER FUNCTIONS ###################################
-def bindID(datalist,callerid,roomid = None):
-	bindapp = {
-		'arc': 'arcID',
-		'qq': 'qqID',
-		'pjsk': 'pjskID',
-		'mai': 'maiID'
-	}
-	if len(datalist) == 0:
-		return ['请指明需要绑定的ID类型和ID']
-	reply_txt = ''
-	if datalist[0] == 'view':
-		# Format: [(arcID,maiID,pjskID)]
-		usrInfo = sql_fetch(cur,'Users',['arcID','maiID','pjskID'],f"wxid = '{callerid}'")[0]
-		id_type = ['Arcaea','maimai查分器','pjsk']
-		unbound_cnt = 0
-		for i in range(len(usrInfo)):
-			if str(usrInfo[i]) != '-1':
-				reply_txt += f'已绑定的{id_type[i]}ID: {usrInfo[i]}\n'
-			else:
-				unbound_cnt += 1
-				reply_txt += f'您没有绑定{id_type[i]}ID\n'
-		if unbound_cnt == len(usrInfo):
-			reply_txt = '您还没有绑定任何ID。\n示例绑定: @WindBot bind mai xxxxx'
-	elif datalist[0] not in bindapp.keys():
-		reply_txt = f'没有该类型ID: {datalist[0]}'
-	else:
-		app, usrID = datalist[0],datalist[1]
-		appsqlID = bindapp.get(app)
-		sql_update(conn,'Users',appsqlID,usrID,f"wxid = '{callerid}'")
-		reply_txt = f'已绑定至 {app}ID: {usrID}'
+def no_op(datalist,callerid,roomid = None):
+	return ['']
+
+def list_functions(datalist,callerid,roomid = None):
+	date = time.strftime("%Y-%m-%d")
+	reply_txt = f"WB的目前可用指令({date}):\n"
+	for func_name in WB_FUNC_DICT:
+		reply_txt += f"{func_name}\n"
+	for func_name in THREADED_FUNC_DICT:
+		reply_txt += f"{func_name}\n"
 	return [reply_txt]
 
-def pat_wb(msgJson):
-	# Refresh the user library to get latest username
-	### NOT WORKING, TIME TO REWRITE IN ASYNC BABY
-	# ws.send(send_wxuser_list())
+def bind(datalist,callerid,roomid = None):
+	bind_categories = {
+		'arc': 'arcID',
+		# 'qq': 'qqID', # For Now, QQID Serves no purpose.
+		'pjsk': 'pjskID',
+		'mai': 'maiID',
+		'pat': 'patAction'
+	}
 
-	wxid = msgJson['content']['id1']
+	if len(datalist) == 0:
+		return ["请指明需要绑定的项目类型和内容。"]
+
+	reply_txt = ""
+
+	keyword = datalist[0]
+
+	# bind view
+	if keyword == "view":
+		reply_txt = bind_view(callerid)
+
+	# Category not found
+	elif keyword not in bind_categories:
+		reply_txt = f"没有该项目: {datalist[0]}"
+
+	# bind xxx yyyy
+	else:
+		app = datalist[0]
+		content = stringQ2B(" ".join(datalist[1:]).strip())
+		app_sql_ID = bind_categories.get(app)
+
+		# For Game IDs
+		if app_sql_ID != 'patAction':
+			reply_txt = f"已绑定至 {app_sql_ID}: {content}"
+		# For PatAction
+		else:
+			if len(content) > 30:
+				reply_txt = "您的PatAction超过了30个字符。"
+				return [reply_txt]
+			elif content.isspace() or content == "":
+				reply_txt = "请提供PatAction。"
+				return [reply_txt]
+			elif "bind" in content:
+				reply_txt = "https://www.google.com/search?q=recursion"
+				return [reply_txt]
+			elif "patstat" in content:
+				reply_txt = "为了解决WB对群聊具有高度侵入性的情况,您不可以将patstat绑定为PatAction。谢谢您的理解。"
+				return [reply_txt]
+			else:
+				reply_txt = f"已将PatAction设置为: {content}"
+
+		# Bind User's content to corresponding app_sql_ID item
+		sql_update(conn, 'Users', app_sql_ID, content, f"wxid = '{callerid}'")
+
+	return [reply_txt]
+
+# Helper for bind Function
+def bind_view(callerid:str) -> str:
+	# Format: [(arcID,maiID,pjskID,funccall)]
+	usrInfo = sql_fetch(cur,'Users',['arcID','maiID','pjskID','patAction'],\
+						f"wxid = '{callerid}'")[0]
+	id_type = ['Arcaea','maimai查分器','pjsk','PatAction指令']
+
+	reply_txt = ""
+
+	unbound_cnt = 0
+	# For Game IDs
+	for i in range(len(usrInfo)-1):
+		if str(usrInfo[i]) != '-1':
+			reply_txt += f'已绑定的{id_type[i]}ID: {usrInfo[i]}\n'
+		else:
+			unbound_cnt += 1
+			reply_txt += f'您没有绑定{id_type[i]}ID\n'
+
+	# For patAction
+	if usrInfo[-1] == '-1':
+		pat_action = f"无\n示例PatAction绑定: {BOT_GC_TRIGGER} bind pat mb50\n"
+	else:
+		pat_action = usrInfo[-1]
+
+	reply_txt += f"PatAction指令: {pat_action}"
+
+	if unbound_cnt == len(usrInfo) - 1:
+		reply_txt = f"您还没有绑定任何ID。\n示例: {BOT_GC_TRIGGER} bind mai xxxxx"
+
+	return reply_txt
+
+def pat_wb(msgJson):
+	from_id = msgJson['content']['id1']
 	username = None
 
 	# If Pat Comes From a Groupchat
-	if wxid[-8:] == 'chatroom':
-		roomid = wxid
+	if from_id[-8:] == 'chatroom':
 		username = msgJson['content']['content'].split('"')[1]
-		wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],\
-							f"groupUsrName = '{username}'")[0][0]
+
+		# Getting the wxid
+		wxid_query = sql_fetch(cur,f'r{from_id[:-9]}',['wxid'],\
+							f"groupUsrName = '{username}'")
+		# If the wxid has been updated but not recorded
+		if wxid_query == []:
+			ws.send(send_txt_msg("您可能更新了昵称,但是未被WB记录。请稍后再试。",\
+								from_id))
+			# Update the User DB
+			ws.send(send_wxuser_list)
+			return
+		wxid = wxid_query[0][0]
+	else:
+		wxid = from_id
 
 	# Increment Recorded patTimes by 1
 	rec_pat_times = sql_fetch(cur,'Users',['patTimes'],\
@@ -998,9 +999,27 @@ def pat_wb(msgJson):
 	new_pat_times = rec_pat_times + 1
 	sql_update(conn,'Users','patTimes',new_pat_times,f"wxid = '{wxid}'")
 
+	# Trigger PatAction
+	pat_data = sql_fetch(cur,'Users',['patAction'],f"wxid = '{wxid}'")[0][0]
+	# If user did not bind any action
+	if pat_data == "-1":
+		reply_txt = f"您没有绑定PatAction指令。\n示例绑定: {BOT_GC_TRIGGER} bind pat mb50\n"
+		reply_txt += f"如果您不想再看到这条信息，请使用 {BOT_GC_TRIGGER} bind pat nop"
+		ws.send(send_txt_msg(reply_txt,from_id))
+	# User binded action
+	else:
+		call_data = pat_data.split(" ")
+		func_name = call_data[0]
+		real_data = call_data[1:]
+		callerid = wxid
+		if pat_data not in ['nop', 'swym']:
+			ws.send(send_txt_msg(f"正在执行『{pat_data}』",from_id))
+		execute_call(func_name,real_data,callerid,from_id)
+
 	# Reply
-	reply_txt = f"第{new_pat_times}次了！"
-	ws.send(send_txt_msg(reply_txt,msgJson['content']['id1']))
+	## Removed. WB was never meant to be intrusive to the chat.
+	# reply_txt = f"第{new_pat_times}次了！"
+	# ws.send(send_txt_msg(reply_txt,from_id))
 
 def patstat(datalist,callerid,roomid = None):
 	patTimes = sql_fetch(cur,'Users',['patTimes'],f"wxid = '{callerid}'")[0][0]
@@ -1129,7 +1148,7 @@ def mai_best(datalist,callerid,roomid = None):
 		gamertag = sql_fetch(cur_thread,'Users',['maiID'],\
 							f"wxid = '{callerid}'")[0][0]
 		if gamertag == '-1':
-			ws.send(send_txt_msg('您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: @WindBot bind mai xxxxx',roomid))
+			ws.send(send_txt_msg(f'您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: {BOT_GC_TRIGGER} bind mai xxxxx',roomid))
 			return
 
 	image = draw_best_image(gamertag)
@@ -1160,7 +1179,7 @@ def mai_plate(datalist,callerid,roomid = None):
 	gamertag = sql_fetch(cur_thread,'Users',['maiID'],\
 						f"wxid = '{callerid}'")[0][0]
 	if gamertag == '-1':
-		ws.send(send_txt_msg('您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: @WindBot bind mai xxxxx',roomid))
+		ws.send(send_txt_msg(f'您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: {BOT_GC_TRIGGER} bind mai xxxxx',roomid))
 		return
 
 	reply_txt = mai_plate_status(gamertag, datalist)
@@ -1201,7 +1220,7 @@ def rss_push(feed):
 	cur_thread = conn_thread.cursor()
 	groups = sql_fetch(cur_thread,'Groupchats',['*'],"rssPush = 1")
 	if len(groups) == 0:
-		ws.send(send_txt_msg('目前没有群聊开启rss推送',OP_LIST[0]))
+		ws.send(send_txt_msg('目前没有群聊开启rss推送',SUDO_LIST[0]))
 	else:
 		feed_content = f"""{feed[0][3]}@{feed[0][1]}:\n{feed[0][0]}\
 							\nLink: {feed[0][2]}"""
@@ -1219,10 +1238,10 @@ def rss_push(feed):
 			# Record group in feedback
 			op_fdbk_txt += f"{g[1]}({g[0]})\n"
 		# Feedback
-		ws.send(send_txt_msg(op_fdbk_txt,OP_LIST[0]))
+		ws.send(send_txt_msg(op_fdbk_txt,SUDO_LIST[0]))
 
 ########################## MANAGING FUNCTIONS ##############################
-def refresh(datalist,callerid,roomid = None):
+def manual_refresh(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 
 	if caller_level[0][0] < 3:
@@ -1232,6 +1251,9 @@ def refresh(datalist,callerid,roomid = None):
 	ws.send(send_wxuser_list())
 
 	return['已刷新']
+
+def wb_refresh():
+	pass
 
 def fetch_logs(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
@@ -1276,7 +1298,8 @@ def switch_announce(datalist,callerid,roomid = None):
 			return ['请提供群组ID。']
 		elif not datalist[0].isnumeric():
 			return ['请提供纯数字的群组ID。']
-		roomid = int(datalist[0])
+		else:
+			roomid = int(datalist[0])
 	else:
 		roomid = roomid[:-9]
 
@@ -1310,7 +1333,8 @@ def switch_rss(datalist,callerid,roomid = None):
 			return ['请提供群组ID。']
 		elif not datalist[0].isnumeric():
 			return ['请提供纯数字的群组ID。']
-		roomid = int(datalist[0])
+		else:
+			roomid = int(datalist[0])
 	else:
 		roomid = roomid[:-9]
 
@@ -1374,7 +1398,7 @@ def feedback(datalist,callerid,roomid = None):
 								f"wxid = '{callerid}'")[0][0]
 			msg += f"来自{nickname}({callerid})的DM反馈:\n"
 		msg += " ".join(datalist)
-		handler = OP_LIST[0]
+		handler = SUDO_LIST[0]
 		ws.send(send_txt_msg(msg,handler))
 		return ['发送完成']
 
@@ -1416,7 +1440,7 @@ def sys_battery_status():
 def btry_check_auto():
 	status, description = sys_battery_status()
 	if status == 0:
-		ws.send(send_txt_msg("[警告] 机器目前电池情况: {description}"),OP_LIST[0])
+		ws.send(send_txt_msg("[警告] 机器目前电池情况: {description}"),SUDO_LIST[0])
 		output(f"DISCHARGING BATTERY - {description}",\
 				logtype = "WARNING", background = "RED")
 	else:
@@ -1455,7 +1479,7 @@ def ban(datalist,callerid,roomid = None):
 			except Exception as _:
 				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
 				continue
-		if wxid in OP_LIST:
+		if wxid in SUDO_LIST:
 			ws.send(send_txt_msg('已跳过管理员',roomid))
 			continue
 		cnt += 1
@@ -1495,7 +1519,6 @@ def set_admin(datalist,callerid,roomid = None):
 
 	if caller_level[0][0] < 2:
 		return ['您的权限不足。']
-
 	if datalist[0] == '*':
 		datalist = [row[0] for row in sql_fetch(cur,f'r{roomid[:-9]}',['wxid'])]
 
@@ -1504,8 +1527,9 @@ def set_admin(datalist,callerid,roomid = None):
 		wxid = nickname
 		if wxid[:4] != 'wxid':
 			try:
-				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],f"groupUsrName = '{nickname}'")[0][0]
-				if wxid in OP_LIST:
+				wxid = sql_fetch(cur,f'r{roomid[:-9]}',['wxid'],\
+								f"groupUsrName = '{nickname}'")[0][0]
+				if wxid in SUDO_LIST:
 					continue
 			except Exception as e:
 				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
@@ -1535,7 +1559,7 @@ def punch(datalist,callerid,roomid = None):
 			except Exception as e:
 				output('Skipping user because user doesn\'t exist','WARNING','HIGHLIGHT','WHITE')
 				continue
-		if wxid in OP_LIST:
+		if wxid in SUDO_LIST:
 			ws.send(send_txt_msg('已跳过WDS',roomid))
 			continue
 		# output(wxid)
@@ -1546,12 +1570,38 @@ def punch(datalist,callerid,roomid = None):
 
 def set_super(datalist,callerid,roomid = None):
 	ws.send(send_txt_msg('NEVER GONNA GIVE YOU UP\nBUT I AM GONNA LET YOU DOWN\nSAY GOODBYE',roomid))
-	ban([callerid],'wxid_xd4gc9mu3stx12',roomid)
-	punch([callerid],'wxid_xd4gc9mu3stx12',roomid)
+	ban([callerid],SUDO_LIST[0],roomid)
+	punch([callerid],SUDO_LIST[0],roomid)
 	return['']
 
 def list_admin(datalist,callerid,roomid = None):
-	pass
+	# If comes from DM
+	if callerid == roomid:
+		ws.send(send_txt_msg("DM不支持listadmin。",roomid))
+		return
+	group_user_list = sql_fetch(cur,f"r{roomid[:-9]}",\
+								["wxid","groupUsrName"])
+	# print(group_user_list)
+	group_admins = []
+
+	for usrInfo in group_user_list:
+		wxid, username = usrInfo[0], usrInfo[1]
+		power_level = sql_fetch(cur,'Users',['powerLevel'],\
+								f"wxid = '{wxid}'")[0][0]
+		if power_level >= 2:
+			group_admins.append((username,power_level))
+
+	# No Admins in this group
+	if len(group_admins) == 0:
+		reply_txt = "本群无Admin。"
+	# Found Admin in this group
+	else:
+		reply_txt = "本群Admin:\n"
+		power_level_list = ["管理员","Sudoer"]
+		for usrInfo in group_admins:
+			username, power_level = usrInfo[0], usrInfo[1]
+			reply_txt += f"{username} - {power_level_list[power_level-2]}\n"
+	return [reply_txt]
 
 ################################ MAIN #######################################
 if __name__ == "__main__":
@@ -1559,13 +1609,132 @@ if __name__ == "__main__":
 	conn = sqlite3.connect(os.path.join(project_path, "windbotDB.db"))
 	cur = conn.cursor()
 
-	# conn.execute('''ALTER TABLE Users DROP COLUMN isInLink''')
+	# conn.execute('''UPDATE Users SET patAction = '-1' WHERE patAction = 'patstat' ''')
 
 	sql_initialize_users()
 	sql_initialize_groupnames()	
 
 	arcdb = sqlite3.connect(os.path.join(project_path, "arcsong.db"))
 	arcur = arcdb.cursor()
+
+	'''Initialize Function Switches'''
+	WB_FUNC_DICT = {
+		'bind': bind,
+		'patstat': patstat,
+		'fdbk': feedback,
+		'btry': btry_check_trigger,
+		'listfunc': list_functions,
+		'swym': no_op,
+		'nop': no_op,
+
+		'ban': ban,
+		'unban':unban,
+		'refresh': manual_refresh,
+		'setadmin': set_admin,
+		'listadmin': list_admin,
+		'punch':punch,
+		'setsuper': set_super,
+		'announce': announce,
+		'annswitch': switch_announce,
+		'annview': view_announce,
+		'rssswitch': switch_rss,
+		'rssview': view_rss,
+		# 'testrss': test_rss_wrapper,
+
+		'logs': fetch_logs,
+
+		'ainfo': arc_music_search,
+		'randarc': arc_random,
+		'acinfo': arc_chart_info,
+		'awhat': arc_alias_search,
+		'grablevel': grablevel,
+		'constable': constable,
+		'addalias': addalias,
+
+		'minfo': mai_music_search,
+		'mwhat':mai_alias_search,
+		'mnew': mai_music_new,
+		'randmai': mai_music_random,
+		'mupdate': mai_update,
+
+		'pjskpf': pjskpf,
+		'pwhat': pjsk_alias_search,
+		'pinfo': pjsk_music_search,
+		'pcinfo': pjsk_chart_search,
+		'amikaiden': amIkaiden,
+		'pupdate': pjsk_data_update
+	}
+
+	DEPRECIATED_FUNC_DICT = {
+		"b30": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
+		"arcrecent": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
+		"mb40": "请移步maimai b50。\n指令: mb50"
+	}
+
+	THREADED_FUNC_DICT = {
+		"gosen": gen_5000, # Thank you Kevin
+		"mb50": mai_best,
+		"mplate": mai_plate,
+		"pjskev": pjsk_curr_event,
+		"whatanime": anime_by_url,
+		"cmd": cmd_trigger
+	}
+
+
+	''' Initialize Anime Query '''
+	ANIME_QUERY = """
+	query ($id: Int, $idMal:Int, $search: String) {
+		Media (id: $id, idMal: $idMal, search: $search, type: ANIME) {
+			id
+			idMal
+			title {
+				romaji
+				english
+				native
+			}
+			format
+			status
+			episodes
+			duration
+			countryOfOrigin
+			source (version: 2)
+			trailer {
+				id
+				site
+			}
+			genres
+			tags {
+				name
+			}
+			averageScore
+			relations {
+				edges {
+					node {
+						title {
+							romaji
+							english
+						}
+						id
+						type
+					}
+					relationType
+				}
+			}
+			nextAiringEpisode {
+				timeUntilAiring
+				episode
+			}
+			isAdult
+			isFavourite
+			mediaListEntry {
+				status
+				score
+				id
+			}
+			siteUrl
+		}
+	}
+	"""
 
 	'''Initialize Websocket'''
 	# websocket.enableTrace(True)
