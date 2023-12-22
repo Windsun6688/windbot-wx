@@ -44,30 +44,40 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 <details>
   <summary>点我展开 Click To Expand</summary>
 
-  - 2023.12.15
-    
+- 2023.12.23
+
+    - 更新功能:
+
+        - minfo现在会将DX后版本号显示为国行版本
+        - parrot更改为触发词触发
+
+- 2023.12.20
+
+    - 添加功能:
+
+        - parrot 随机发送一张派对鹦鹉图片
+
+- 2023.12.15
     - 修复功能:
-    
+
         - 当WB未记录昵称被拍时，会正确刷新用户
-    
+
         - 调用时的前置和后置空格已被chomp
-    
-  - 2023.12.15
+- 2023.12.15
 
     - 修复功能:
 
         - PatAction可以连环绑定的问题
         - 使用设定为patstat的PatAction对群组造成侵入性影响的问题
+- 2023.12.13
 
-  - 2023.12.13
+  - **WindBot一周年！**🎉
+  - 新增功能:
 
+    - PatAction 拍一拍WB执行预设定命令
+    - 使用“WB"呼出WindBot
+    - listfunc 展示所有可用命令
 
-    - WindBot一周年！
-    - 新增功能:
-    
-        - PatAction 拍一拍WB执行预设定命令
-        - 使用“WB"呼出WindBot
-        - listfunc 展示所有可用命令
 
   - 2023.12.4
 
