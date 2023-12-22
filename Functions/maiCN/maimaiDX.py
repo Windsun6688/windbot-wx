@@ -28,6 +28,30 @@ BaseRa = [0.0, 5.0, 6.0, 7.0, 7.5, 8.5, 9.5, 10.5, 12.5, 12.7,\
 BaseRaSpp = [7.0, 8.0, 9.6, 11.2, 12.0, 13.6, 15.2, 16.8, 20.0,\
                     20.3, 20.8, 21.1, 21.6, 22.4]
 
+JPVER_2_CNVER = {
+    "maimai": "maimai",
+    "maimai PLUS": "maimai PLUS",
+    "maimai GreeN": "maimai GreeN",
+    "maimai GreeN PLUS": "maimai GreeN PLUS",
+    "maimai ORANGE": "maimai ORANGE",
+    "maimai ORANGE PLUS": "maimai ORANGE PLUS",
+    "maimai PiNK": "maimai PiNK",
+    "maimai PiNK PLUS": "maimai PiNK PLUS",
+    "maimai MURASAKi": "maimai MURASAKi",
+    "maimai MURASAKi PLUS": "maimai MURASAKi PLUS",
+    "maimai MiLK": "maimai MiLK",
+    "maimai MiLK PLUS": "maimai MiLK PLUS",
+    "maimai FiNALE": "maimai FiNALE",
+    "maimai でらっくす": "舞萌DX",
+    "maimai でらっくす PLUS": "舞萌DX",
+    "maimai でらっくす Splash": "舞萌DX2021",
+    "maimai でらっくす Splash PLUS": "舞萌DX2021",
+    "maimai でらっくす UNiVERSE": "舞萌DX2022",
+    "maimai でらっくす UNiVERSE PLUS": "舞萌DX2022",
+    "maimai でらっくす FESTiVAL": "舞萌DX2023",
+    "maimai でらっくす FESTiVAL PLUS": "舞萌DX2023",
+}
+
 API_ALIAS = {
     'all': 'MaimaiDXAlias',
     'songs': 'GetSongs',
@@ -468,7 +492,8 @@ def mai_music_search(datalist,callerid,roomid = None):
         title = s['title']
 
         artist = s['basic_info']['artist']
-        version = s['basic_info']['from']
+        JP_version = s['basic_info']['from']
+        CN_version = JPVER_2_CNVER.get(JP_version,JP_version)
         category = s['basic_info']['genre']
         bpm = s['basic_info']['bpm']
         ds = s['ds']
@@ -481,7 +506,7 @@ def mai_music_search(datalist,callerid,roomid = None):
         if len(ds) == 5:
             remas_txt = f' | ReMas{ds[4]}\n'
 
-        reply_txt += f"\n[{is_DX}]{new_txt} {artist} - {title}\n-版本:{version} | 分区:{category} | BPM:{bpm}\n--Bas{ds[0]} | Adv{ds[1]} | Exp{ds[2]} | Mas{ds[3]}{remas_txt}---Song ID: {sid}"
+        reply_txt += f"\n[{is_DX}]{new_txt} {artist} - {title}\n-版本:{CN_version} | 分区:{category} | BPM:{bpm}\n--Bas{ds[0]} | Adv{ds[1]} | Exp{ds[2]} | Mas{ds[3]}{remas_txt}---Song ID: {sid}"
     return [reply_txt]
 
 def mai_music_by_id(song_id: int):

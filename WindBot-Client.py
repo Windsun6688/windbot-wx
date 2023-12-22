@@ -650,11 +650,12 @@ def handle_recv_pic(msgJson):
 		output(f'{nickname}: [IMAGE]','DM')
 
 def handle_recv_call(keyword, callerid, destination):
-	caller_isbanned = sql_fetch(cur,'Users',['banned'],f"wxid = '{callerid}'")
+	caller_isbanned = sql_fetch(cur,'Users',['banned'],\
+								f"wxid = '{callerid}'")
 	if caller_isbanned[0][0] == 1:
 		return
 
-	call_data = stringQ2B(keyword).split(' ')
+	call_data = stringQ2B(keyword.strip()).split(' ')
 	if len(call_data) == 0:
 		ws.send('请指明需要调用的功能。')
 		return
@@ -823,6 +824,8 @@ def handle_recv_msg(msgJson):
 	elif keyword.lower() == 'friday':
 		ws.send(send_txt_msg(today_is_friday_in_california(msgJson['wxid']),\
 							wxid = msgJson['wxid']))
+	elif keyword.lower() == 'parrot':
+		party_parrot(roomid = msgJson['wxid'])
 	elif keyword.lower() == 'wb':
 		resp_list = ["您好!","我可以帮到您些什么?"]
 		ws.send(send_txt_msg(random.choice(resp_list),wxid = msgJson['wxid']))
@@ -987,7 +990,7 @@ def pat_wb(msgJson):
 			ws.send(send_txt_msg("您可能更新了昵称,但是未被WB记录。请稍后再试。",\
 								from_id))
 			# Update the User DB
-			ws.send(send_wxuser_list)
+			ws.send(send_wxuser_list())
 			return
 		wxid = wxid_query[0][0]
 	else:
@@ -1049,23 +1052,34 @@ def patstat(datalist,callerid,roomid = None):
 def today_is_friday_in_california(roomid = None):
 	california = timezone('America/Los_Angeles')
 	if int(datetime.now(california).strftime("%w")) == 5:
-		ws.send(send_attatch(f'{resource_path}\\Friday\\Today is Friday in California.mp4',roomid))
-		return 'Today is Friday in California.'
-	return 'Today is not Friday in California.'
+		friday_path = os.path.join(resource_path,"Friday")
+		shoot_vid = os.path.join(friday_path,\
+								"Today is Friday in California.mp4")
+		ws.send(send_attatch(shoot_vid,roomid))
+		return "Today is Friday in California.\nSHOOT!"
+	return "Today is not Friday in California."
 
 def gen_5000(datalist,callerid,roomid = None):
 	if len(datalist) == 0:
 		first_keyword = "5000兆円"
 		second_keyword = "欲しい!"
 	elif len(datalist) != 2:
-		return ['请尝试检查指令参数。']
+		ws.send("请尝试检查指令参数。",roomid)
+		return
 	else:
 		first_keyword = datalist[0]
 		second_keyword = datalist[1]
 
-	genImage(word_a = first_keyword,word_b = second_keyword).save(f"{resource_path}\\Gosenchoyen\\5000.jpeg")
-	ws.send(send_attatch(f"{resource_path}\\Gosenchoyen\\5000.jpeg",roomid))
-	return ['']
+	gosenImagePath = os.path.join(os.path.join(resource_path,"Gosenchoyen"),\
+									"5000.jpeg")
+	genImage(word_a = first_keyword,word_b=second_keyword).save(gosenImagePath)
+	ws.send(send_attatch(gosenImagePath,roomid))
+
+def party_parrot(roomid):
+	parrot_path = os.path.join(resource_path,"Parrot")
+	chosen_parrot = random.choice(os.listdir(parrot_path))
+	chosen_path = os.path.join(parrot_path,chosen_parrot)
+	ws.send(send_pic(chosen_path,roomid))
 
 #-----Arcaea-----
 def constable(datalist,callerid,roomid = None):
@@ -1251,9 +1265,6 @@ def manual_refresh(datalist,callerid,roomid = None):
 	ws.send(send_wxuser_list())
 
 	return['已刷新']
-
-def wb_refresh():
-	pass
 
 def fetch_logs(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
@@ -1679,7 +1690,6 @@ if __name__ == "__main__":
 		"whatanime": anime_by_url,
 		"cmd": cmd_trigger
 	}
-
 
 	''' Initialize Anime Query '''
 	ANIME_QUERY = """
