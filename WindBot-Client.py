@@ -821,11 +821,6 @@ def handle_recv_msg(msgJson):
 	elif keyword == '∩':
 		reply_txt = '‎'
 		ws.send(send_txt_msg(reply_txt, wxid = msgJson['wxid']))
-	elif keyword.lower() == 'friday':
-		ws.send(send_txt_msg(today_is_friday_in_california(msgJson['wxid']),\
-							wxid = msgJson['wxid']))
-	elif keyword.lower() == 'parrot':
-		party_parrot(roomid = msgJson['wxid'])
 	elif keyword.lower() == 'wb':
 		resp_list = ["您好!","我可以帮到您些什么?"]
 		ws.send(send_txt_msg(random.choice(resp_list),wxid = msgJson['wxid']))
@@ -1002,6 +997,12 @@ def pat_wb(msgJson):
 	new_pat_times = rec_pat_times + 1
 	sql_update(conn,'Users','patTimes',new_pat_times,f"wxid = '{wxid}'")
 
+	# Check if patter is banned
+	caller_isbanned = sql_fetch(cur,'Users',['banned'],\
+								f"wxid = '{wxid}'")
+	if caller_isbanned[0][0] == 1:
+		return
+
 	# Trigger PatAction
 	pat_data = sql_fetch(cur,'Users',['patAction'],f"wxid = '{wxid}'")[0][0]
 	# If user did not bind any action
@@ -1049,15 +1050,19 @@ def patstat(datalist,callerid,roomid = None):
 	reply_txt = f"你总共拍了我{patTimes}次{react}"
 	return [reply_txt]
 
-def today_is_friday_in_california(roomid = None):
+def today_is_friday_in_california(datalist,callerid,roomid = None):
 	california = timezone('America/Los_Angeles')
+	# If Today is Friday in California
 	if int(datetime.now(california).strftime("%w")) == 5:
 		friday_path = os.path.join(resource_path,"Friday")
 		shoot_vid = os.path.join(friday_path,\
 								"Today is Friday in California.mp4")
 		ws.send(send_attatch(shoot_vid,roomid))
-		return "Today is Friday in California.\nSHOOT!"
-	return "Today is not Friday in California."
+		reply_txt = "Today is Friday in California.\nSHOOT!"
+	# If today is not Friday in California
+	else:
+		reply_txt = "Today is not Friday in California."
+	ws.send(send_txt_msg(reply_txt,roomid))
 
 def gen_5000(datalist,callerid,roomid = None):
 	if len(datalist) == 0:
@@ -1075,11 +1080,33 @@ def gen_5000(datalist,callerid,roomid = None):
 	genImage(word_a = first_keyword,word_b=second_keyword).save(gosenImagePath)
 	ws.send(send_attatch(gosenImagePath,roomid))
 
-def party_parrot(roomid):
+def party_parrot(datalist,callerid,roomid = None):
+	if len(datalist) >= 1:
+		keyword = datalist[0]
+	else:
+		keyword = None
+
 	parrot_path = os.path.join(resource_path,"Parrot")
-	chosen_parrot = random.choice(os.listdir(parrot_path))
-	chosen_path = os.path.join(parrot_path,chosen_parrot)
-	ws.send(send_pic(chosen_path,roomid))
+	hd_parrot_path = os.path.join(parrot_path,"hd")
+
+	if keyword == None:
+		chosen_path = hd_parrot_path
+	elif keyword == "l":
+		chosen_path = parrot_path
+	else:
+		ws.send(send_txt_msg(f"没有该参数: {keyword}",roomid))
+		return
+
+	chosen_parrot = random.choice(os.listdir(chosen_path))
+	# If the folder "hd" is randomly chosen
+	while chosen_parrot == "hd":
+		chosen_parrot = random.choice(os.listdir(chosen_path))
+
+	chosen_parrot_path = os.path.join(chosen_path,chosen_parrot)
+
+	reply_txt = f"你的鹦鹉是:\n{chosen_parrot[:-4]}"
+	ws.send(send_txt_msg(reply_txt,roomid))
+	ws.send(send_attatch(chosen_parrot_path,roomid))
 
 #-----Arcaea-----
 def constable(datalist,callerid,roomid = None):
@@ -1684,6 +1711,8 @@ if __name__ == "__main__":
 
 	THREADED_FUNC_DICT = {
 		"gosen": gen_5000, # Thank you Kevin
+		"friday": today_is_friday_in_california,
+		"parrot": party_parrot,
 		"mb50": mai_best,
 		"mplate": mai_plate,
 		"pjskev": pjsk_curr_event,

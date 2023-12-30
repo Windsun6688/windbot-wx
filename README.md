@@ -44,19 +44,24 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 <details>
   <summary>点我展开 Click To Expand</summary>
 
-- 2023.12.23
+- 2023.12.30
 
+    - 更新功能：
+
+        - parrot, friday更改为@命令触发
+        - parrot现在会发送parrot名称+更高清的parrot动图
+        - parrot新增参数 `l`（lowres）发送之前的低像素版本动图
+
+- 2023.12.23
     - 更新功能:
 
         - minfo现在会将DX后版本号显示为国行版本
         - parrot更改为触发词触发
-
 - 2023.12.20
 
     - 添加功能:
 
         - parrot 随机发送一张派对鹦鹉图片
-
 - 2023.12.15
     - 修复功能:
 
