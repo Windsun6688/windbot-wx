@@ -303,7 +303,7 @@ def mai_plate_item_check(item, plan:int)-> bool:
         return item in ['fc', 'fcp','ap','app']
     # 将
     elif plan == 1:
-        return item > 100.0
+        return item >= 100.0
     # 神
     elif plan == 2:
         return item in ['ap', 'app']
@@ -312,7 +312,7 @@ def mai_plate_item_check(item, plan:int)-> bool:
         return item in ['fsd', 'fsdp']
     # Clear
     elif plan == 4:
-        return item > 80.0
+        return item >= 80.0
 
 def mai_phrase_2_plate(phrase: str) -> (list,str):
     ver = phrase[0]
@@ -711,10 +711,12 @@ def rating_picture(rating: int, b50: bool) -> str:
             num = '06'
         elif rating < (13000 if b50 else 7000):
             num = '07'
-        elif rating < (14500 if b50 else 8000):
+        elif rating < (14000 if b50 else 7000):
             num = '08'
-        elif rating < (15000 if b50 else 8500):
+        elif rating < (14500 if b50 else 8000):
             num = '09'
+        elif rating < (15000 if b50 else 8500):
+            num = '10'
         return f'UI_CMN_DXRating_{num}.png'
 
 def friend_match_picture(addrating: int) -> str:

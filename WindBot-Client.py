@@ -437,6 +437,8 @@ def handle_wxuser_list(j):
 	ws.send(get_chatroom_memberlist(item['wxid']))
 
 ################################# INITIALIZE ###############################
+
+# Hearbeat every min
 def heartbeat_trigger(msgJson):
 	global undisturbed_hb, global_event_tick
 	undisturbed_hb += 1
@@ -463,6 +465,7 @@ def heartbeat_trigger(msgJson):
 		tBtry = Thread(target = btry_check_auto, args = ())
 		tBtry.start()
 
+# When windbot is ran
 def on_open(ws):
 	#初始化 更新用户数据
 	ws.send(send_wxuser_list())
@@ -489,12 +492,15 @@ def on_open(ws):
 	"""
 	print(start_ascii_art)
 
+# Windbot Connection Error (unlikely)
 def on_error(ws,error):
 	output(f"on_error:{error}",'ERROR','HIGHLIGHT','RED')
 
+# Windbot Connection Close (very unlikely)
 def on_close(ws,signal,status):
 	output("Server Closed",'WARNING','HIGHLIGHT','WHITE')
 
+# Initialize the SQL Structures. Group-Specific Table
 def sql_initialize_group(roomid):
 	initialize_group = f'''CREATE TABLE IF NOT EXISTS {roomid}
 			(wxid TEXT,
@@ -502,6 +508,7 @@ def sql_initialize_group(roomid):
 	conn.execute(initialize_group)
 	conn.commit()
 
+# Initialize the SQL Structures. Users Table
 def sql_initialize_users():
 	initialize_users = f'''CREATE TABLE IF NOT EXISTS Users
 			(wxid TEXT,
@@ -518,6 +525,7 @@ def sql_initialize_users():
 	conn.execute(initialize_users)
 	conn.commit()
 
+# Initialize the SQL Structures. Groupchats Table
 def sql_initialize_groupnames():
 	initialize_gn = f'''CREATE TABLE IF NOT EXISTS Groupchats
 			(roomid TEXT,
@@ -528,6 +536,7 @@ def sql_initialize_groupnames():
 	conn.commit()
 
 ################################# SEND MSG #################################
+
 def destroy_all():
 	qs={
 		'id':getid(),
@@ -537,6 +546,7 @@ def destroy_all():
 	}
 	return json.dumps(qs)
 
+# Tell websocket wxapi to send a text message
 def send_txt_msg(msg,wxid='null'):
 	if msg.endswith('.png'):
 		msg_type=PIC_MSG
@@ -556,6 +566,7 @@ def send_txt_msg(msg,wxid='null'):
 	output(f'{msg} -> {wxid}','SEND')
 	return json.dumps(qs)
 
+# Tell websocket wxapi to send an attachment
 def send_attatch(filepath,wxid = 'null'):
 	qs={
 		'id':getid(),
@@ -569,6 +580,7 @@ def send_attatch(filepath,wxid = 'null'):
 	output(f'File @ {filepath} -> {wxid}','SEND')
 	return json.dumps(qs)
 
+# Tell websocket wxapi to send an attachment.
 def send_pic(filepath,wxid = 'null'):
 	qs={
 		'id':getid(),
@@ -583,20 +595,24 @@ def send_pic(filepath,wxid = 'null'):
 	return json.dumps(qs)
 
 ############################## HANDLES #####################################
+
+# wxapi: handle status message
 def handle_status_msg(msgJson):
 	vis_content = msgJson['content']['content']
 	if '拍了拍我' in vis_content:
 		output(vis_content,'PAT',background = 'MINT')
 		pat_wb(msgJson)
 
-	elif '邀请' in vis_content:
+	elif '邀请' in vis_content and '加入群聊' in vis_content:
 		ws.send(send_wxuser_list())
 		roomid=msgJson['content']['id1']
 		ws.send(send_txt_msg(f'欢迎进群',wxid=roomid))
 
+# wxapi: handle sent message
 def handle_sent_msg(msgJson):
 	output(msgJson['content'],mode = 'HIGHLIGHT')
 
+# wxapi: handle xml message *Very Broken :(
 def handle_xml_msg(msgJson):
 	# 处理带引用的文字消息和转发链接
 	msgXml=msgJson['content']['content'].replace('&amp;','&').replace('&lt;','<').replace('&gt;','>')
@@ -623,10 +639,12 @@ def handle_xml_msg(msgJson):
 	}
 	handle_recv_msg(msgJson)
 
+# wxapi: handle at message * Doesn't Work
 def handle_at_msg(msgJson):
 	output(msgJson)
 	output('AT_msg')
 
+# wxapi: handle picture message
 def handle_recv_pic(msgJson):
 	msgJson = msgJson['content']
 
@@ -649,6 +667,7 @@ def handle_recv_pic(msgJson):
 		'''
 		output(f'{nickname}: [IMAGE]','DM')
 
+# Call detected in received text message
 def handle_recv_call(keyword, callerid, destination):
 	caller_isbanned = sql_fetch(cur,'Users',['banned'],\
 								f"wxid = '{callerid}'")
@@ -725,6 +744,7 @@ def execute_call(func_name, real_data, callerid, destination):
 		ws.send(send_txt_msg(f"没有该指令: {func_name}",destination))
 		return
 
+# wxapi: handle text message
 def handle_recv_msg(msgJson):
 	global undisturbed_hb
 	undisturbed_hb = 0
@@ -825,6 +845,7 @@ def handle_recv_msg(msgJson):
 		resp_list = ["您好!","我可以帮到您些什么?"]
 		ws.send(send_txt_msg(random.choice(resp_list),wxid = msgJson['wxid']))
 
+# Character Q2B
 def Q2B(uchar):
 	"""单个字符 全角转半角"""
 	inside_code = ord(uchar)
@@ -836,11 +857,14 @@ def Q2B(uchar):
 		return uchar
 	return chr(inside_code)
 
+# String Q2B
 def stringQ2B(ustring):
 	"""把字符串全角转半角"""
 	return "".join([Q2B(uchar) for uchar in ustring])
 
 ######################### ON MSG SWITCH #####################################
+
+# Call handlers when received message from the wxapi
 def on_localapi_message(ws,message):
 	j=json.loads(message)
 	resp_type=j['type']
@@ -871,9 +895,24 @@ def on_localapi_message(ws,message):
 	action.get(resp_type,print)(j)
 
 ########################## USER FUNCTIONS ###################################
+
+# Do nothing
 def no_op(datalist,callerid,roomid = None):
 	return ['']
 
+# Randomly select from given data
+def rand_item(datalist,callerid,roomid = None):
+	data_len = len(list(set(datalist)))
+	if data_len < 1:
+		reply_txt = "您没有提供随机清单。"
+	elif data_len == 1:
+		reply_txt = "您知道吗？他们曾经说WB做决策的时候很困难，但是现在WB不确定了。"
+	else:
+		reply_txt = f"WB为您随机(1/{data_len})挑选了:\n"
+		reply_txt += random.choice(datalist)
+	return [reply_txt]
+
+# List all Functions from the global function dict
 def list_functions(datalist,callerid,roomid = None):
 	date = time.strftime("%Y-%m-%d")
 	reply_txt = f"WB的目前可用指令({date}):\n"
@@ -883,6 +922,7 @@ def list_functions(datalist,callerid,roomid = None):
 		reply_txt += f"{func_name}\n"
 	return [reply_txt]
 
+# Bind user with provided data in SQL / check binded data
 def bind(datalist,callerid,roomid = None):
 	bind_categories = {
 		'arc': 'arcID',
@@ -969,6 +1009,7 @@ def bind_view(callerid:str) -> str:
 
 	return reply_txt
 
+# Handles pat action
 def pat_wb(msgJson):
 	from_id = msgJson['content']['id1']
 	username = None
@@ -1025,6 +1066,7 @@ def pat_wb(msgJson):
 	# reply_txt = f"第{new_pat_times}次了！"
 	# ws.send(send_txt_msg(reply_txt,from_id))
 
+# Query how many pats
 def patstat(datalist,callerid,roomid = None):
 	patTimes = sql_fetch(cur,'Users',['patTimes'],f"wxid = '{callerid}'")[0][0]
 
@@ -1050,6 +1092,7 @@ def patstat(datalist,callerid,roomid = None):
 	reply_txt = f"你总共拍了我{patTimes}次{react}"
 	return [reply_txt]
 
+# Meme Function: Today is Friday in California
 def today_is_friday_in_california(datalist,callerid,roomid = None):
 	california = timezone('America/Los_Angeles')
 	# If Today is Friday in California
@@ -1064,6 +1107,7 @@ def today_is_friday_in_california(datalist,callerid,roomid = None):
 		reply_txt = "Today is not Friday in California."
 	ws.send(send_txt_msg(reply_txt,roomid))
 
+# Meme Function: Generate GosenchoyenHoshiii Picture
 def gen_5000(datalist,callerid,roomid = None):
 	if len(datalist) == 0:
 		first_keyword = "5000兆円"
@@ -1080,6 +1124,7 @@ def gen_5000(datalist,callerid,roomid = None):
 	genImage(word_a = first_keyword,word_b=second_keyword).save(gosenImagePath)
 	ws.send(send_attatch(gosenImagePath,roomid))
 
+# Meme Function: Send a Party Parrot gif
 def party_parrot(datalist,callerid,roomid = None):
 	if len(datalist) >= 1:
 		keyword = datalist[0]
@@ -1109,11 +1154,13 @@ def party_parrot(datalist,callerid,roomid = None):
 	ws.send(send_attatch(chosen_parrot_path,roomid))
 
 #-----Arcaea-----
+# Send a Chart Constant Table
 def constable(datalist,callerid,roomid = None):
 	ws.send(send_attatch(f'{resource_path}\\ArcaeaConstantTable.jpg',roomid))
 	return ['']
 
 #-----PJSK-----
+# Fetch the current event in PJSK from pjsekai.moe
 def pjsk_curr_event(datalist,callerid,roomid = None):
 	event_type_dict = {
 		'普活': 'marathon', '马拉松': 'marathon', 'marathon': 'marathon',
@@ -1132,6 +1179,7 @@ def pjsk_curr_event(datalist,callerid,roomid = None):
 	ws.send(send_txt_msg(reply_txt,roomid))
 
 #-----ANIME-----
+# Anime Tracing using an uploaded URL (cannot read images)
 def anime_by_url(datalist,callerid,roomid):
 		if len(datalist) == 0:
 				ws.send(send_txt_msg("请提供URL。",roomid))
@@ -1174,12 +1222,14 @@ def anime_by_url(datalist,callerid,roomid):
 		ws.send(send_pic(f"{resource_path}\\WhatAnime\\result.mp4",roomid))
 		#output("SENT VIDEO")
 
+# Helper for anime_by_url
 def anilist_fetchfromid(query:str,vars_: dict):
 		url = "https://graphql.anilist.co"
 		headers = None
 		return requests.post(url,json={"query": query,"variables": vars_},headers=headers).json()
 
 #-----MAIMAI-----
+# Generate a best50 Picture of diving-fish data.
 def mai_best(datalist,callerid,roomid = None):
 	conn_thread = sqlite3.connect('./windbotDB.db')
 	cur_thread = conn_thread.cursor()
@@ -1208,6 +1258,7 @@ def mai_best(datalist,callerid,roomid = None):
 	image = image.save(os.path.join(store_path,f'{gamertag}.png'))
 	ws.send(send_attatch(os.path.join(store_path,f'{gamertag}.png'),roomid))
 
+# Query Plate Status
 def mai_plate(datalist,callerid,roomid = None):
 	conn_thread = sqlite3.connect('./windbotDB.db')
 	cur_thread = conn_thread.cursor()
@@ -1228,10 +1279,12 @@ def mai_plate(datalist,callerid,roomid = None):
 	return
 
 #-----RSS-----
+# Testing Function: rss Subscription
 def test_rss_wrapper(datalist,callerid,roomid = None):
 	rss_trigger()
 	return ['Tested']
 
+# Trigger to query for new RSS feeds
 def rss_trigger():
 	pushed = False
 	for subscribed in rss_subscriptions:
@@ -1256,6 +1309,7 @@ def rss_trigger():
 	elif to_push == -1:
 		output('No New Feed',logtype = 'RSS',background = 'PURPLE')
 
+# Push feeds
 def rss_push(feed):
 	conn_thread = sqlite3.connect('./windbotDB.db')
 	cur_thread = conn_thread.cursor()
@@ -1282,6 +1336,8 @@ def rss_push(feed):
 		ws.send(send_txt_msg(op_fdbk_txt,SUDO_LIST[0]))
 
 ########################## MANAGING FUNCTIONS ##############################
+
+# Trigger an update of the whole windbot user database
 def manual_refresh(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 
@@ -1293,6 +1349,7 @@ def manual_refresh(datalist,callerid,roomid = None):
 
 	return['已刷新']
 
+# Return Recent Logs (Default: 15)
 def fetch_logs(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 
@@ -1308,6 +1365,7 @@ def fetch_logs(datalist,callerid,roomid = None):
 
 	return [reply_txt]
 
+# Announcement Function to specific Groups
 def announce(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 	if caller_level[0][0] < 3:
@@ -1326,6 +1384,7 @@ def announce(datalist,callerid,roomid = None):
 		reply_txt += f"{g[1]}({g[0]})\n"
 	return [reply_txt]
 
+# Switch groups receive announcements status
 def switch_announce(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 	if caller_level[0][0] < 3:
@@ -1351,6 +1410,7 @@ def switch_announce(datalist,callerid,roomid = None):
 	reply_txt = f'群组公告:{bool(ann)}'
 	return [reply_txt]
 
+# View group annoucement receiving status
 def view_announce(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 	if caller_level[0][0] < 3:
@@ -1361,6 +1421,7 @@ def view_announce(datalist,callerid,roomid = None):
 		reply_txt += f'{group[1]} ({group[0]}): {bool(group[2])}\n'
 	return [reply_txt]
 
+# Switch groups receive RSS Feeds status
 def switch_rss(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 	if caller_level[0][0] < 3:
@@ -1386,6 +1447,7 @@ def switch_rss(datalist,callerid,roomid = None):
 	reply_txt = f'群组rss推送:{bool(ann)}'
 	return [reply_txt]
 
+# View group RSS Feeds receiving status
 def view_rss(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 	if caller_level[0][0] < 3:
@@ -1396,6 +1458,7 @@ def view_rss(datalist,callerid,roomid = None):
 		reply_txt += f'{group[1]} ({group[0]}): {bool(group[3])}\n'
 	return [reply_txt]
 
+# Execute a shell command
 def execute_cmd(datalist):
 	timeout_s = 10
 	try:
@@ -1411,6 +1474,7 @@ def execute_cmd(datalist):
 	else:
 		return shell_res
 
+# Provide a one-command shell session through chat
 def cmd_trigger(datalist,callerid,roomid = None):
 	conn = sqlite3.connect(f'{project_path}\\windbotDB.db')
 	cur = conn.cursor()
@@ -1420,6 +1484,7 @@ def cmd_trigger(datalist,callerid,roomid = None):
 		return
 	ws.send(send_txt_msg(execute_cmd(datalist),roomid))
 
+# Forward a message to the Owner's DM
 def feedback(datalist,callerid,roomid = None):
 	if len(datalist) == 0:
 		return ['请提供反馈内容']
@@ -1440,6 +1505,7 @@ def feedback(datalist,callerid,roomid = None):
 		ws.send(send_txt_msg(msg,handler))
 		return ['发送完成']
 
+# Check Machine is charging or not
 def sys_battery_status():
 	cmd = "WMIC Path Win32_Battery Get BatteryStatus"
 	datalist = cmd.split(" ")
@@ -1475,6 +1541,7 @@ def sys_battery_status():
 
 	return (btry_status, btry_description)
 
+# Auto Trigger Machine battery status check through Heartbeat Scheduling
 def btry_check_auto():
 	status, description = sys_battery_status()
 	if status == 0:
@@ -1485,6 +1552,7 @@ def btry_check_auto():
 		output(f"OK BATTERY STATUS - {description}",\
 				logtype = "SYSTEM", background = "WHITE")
 
+# Manually Check machine battery status
 def btry_check_trigger(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 	if caller_level[0][0] < 3:
@@ -1496,6 +1564,8 @@ def btry_check_trigger(datalist,callerid,roomid = None):
 	return [reply_txt]
 
 ##################### GROUP MANAGING FUNCTIONS ##############################
+
+# Ban Certain User from using commands
 def ban(datalist,callerid,roomid = None):
 	# output(datalist)
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
@@ -1526,6 +1596,7 @@ def ban(datalist,callerid,roomid = None):
 
 	return[f'应Ban{len(datalist)}人,实Ban{cnt}人,下班']
 
+# Unban Certain User from using commands
 def unban(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 
@@ -1551,6 +1622,7 @@ def unban(datalist,callerid,roomid = None):
 
 	return[f'应Unban{len(datalist)}人,实Unban{cnt}人,下班']
 
+# Set certain users' power level to 1
 def set_admin(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 	# output(caller_level)
@@ -1578,6 +1650,7 @@ def set_admin(datalist,callerid,roomid = None):
 
 	return[f'应设置{len(datalist)}人,实设置{cnt}人,下班']
 
+# Set certain users' power level to 0
 def punch(datalist,callerid,roomid = None):
 	caller_level = sql_fetch(cur,'Users',['powerLevel'],f"wxid = '{callerid}'")
 	# output(caller_level)
@@ -1606,12 +1679,14 @@ def punch(datalist,callerid,roomid = None):
 
 	return[f'应取消{len(datalist)}人,实取消{cnt}人,下班']
 
+# Meme Function: Rickroll and say goodbye
 def set_super(datalist,callerid,roomid = None):
 	ws.send(send_txt_msg('NEVER GONNA GIVE YOU UP\nBUT I AM GONNA LET YOU DOWN\nSAY GOODBYE',roomid))
 	ban([callerid],SUDO_LIST[0],roomid)
 	punch([callerid],SUDO_LIST[0],roomid)
 	return['']
 
+# List all user with powerlevel >= 2
 def list_admin(datalist,callerid,roomid = None):
 	# If comes from DM
 	if callerid == roomid:
@@ -1659,6 +1734,7 @@ if __name__ == "__main__":
 	WB_FUNC_DICT = {
 		'bind': bind,
 		'patstat': patstat,
+		'rand': rand_item,
 		'fdbk': feedback,
 		'btry': btry_check_trigger,
 		'listfunc': list_functions,

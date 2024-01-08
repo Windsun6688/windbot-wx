@@ -44,6 +44,17 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 <details>
   <summary>点我展开 Click To Expand</summary>
 
+- 2024.01.08
+
+
+    - 更新功能：
+
+        - rand <item1> <item2> [item3]...... 随机抽取项目
+
+    - 修复功能：
+
+        - mb50 rating框颜色不正确的问题
+
 - 2023.12.30
 
     - 更新功能：
@@ -76,20 +87,20 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
         - 使用设定为patstat的PatAction对群组造成侵入性影响的问题
 - 2023.12.13
 
-  - **WindBot一周年！**🎉
+  - WindBot一周年！🎉
+
   - 新增功能:
 
     - PatAction 拍一拍WB执行预设定命令
     - 使用“WB"呼出WindBot
     - listfunc 展示所有可用命令
 
+- 2023.12.4
+  - 修复功能: mplate
+    - 修复了名牌版确定后会多次出现总共计数的问题
+    - 解决了Re:Master计数出错的问题
+    - 华&煌系列的国服特性已经正确显示
 
-  - 2023.12.4
-
-    - 修复功能: mplate
-      - 修复了名牌版确定后会多次出现总共计数的问题
-      - 解决了Re:Master计数出错的问题
-      - 华&煌系列的国服特性已经正确显示
 
   - 2023.12.3
     - 新增功能:
