@@ -45,52 +45,35 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
   <summary>点我展开 Click To Expand</summary>
 
 - 2024.01.08
-
-
     - 更新功能：
-
         - rand <item1> <item2> [item3]...... 随机抽取项目
-
     - 修复功能：
-
         - mb50 rating框颜色不正确的问题
 
 - 2023.12.30
-
     - 更新功能：
-
         - parrot, friday更改为@命令触发
         - parrot现在会发送parrot名称+更高清的parrot动图
         - parrot新增参数 `l`（lowres）发送之前的低像素版本动图
 
 - 2023.12.23
     - 更新功能:
-
         - minfo现在会将DX后版本号显示为国行版本
         - parrot更改为触发词触发
 - 2023.12.20
-
     - 添加功能:
-
         - parrot 随机发送一张派对鹦鹉图片
 - 2023.12.15
     - 修复功能:
-
         - 当WB未记录昵称被拍时，会正确刷新用户
-
         - 调用时的前置和后置空格已被chomp
 - 2023.12.15
-
     - 修复功能:
-
         - PatAction可以连环绑定的问题
         - 使用设定为patstat的PatAction对群组造成侵入性影响的问题
 - 2023.12.13
-
   - WindBot一周年！🎉
-
   - 新增功能:
-
     - PatAction 拍一拍WB执行预设定命令
     - 使用“WB"呼出WindBot
     - listfunc 展示所有可用命令
@@ -101,42 +84,41 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
     - 解决了Re:Master计数出错的问题
     - 华&煌系列的国服特性已经正确显示
 
+- 2023.12.3
+  - 新增功能:
+    - mplate <plate> maimai名牌版进度查询 (Diving-Fish数据源)
 
-  - 2023.12.3
-    - 新增功能:
-      - mplate <plate> maimai名牌版进度查询 (Diving-Fish数据源)
+- 2023.12.1
+  - 改善了功能呼叫结构
+  - 新增功能:
+    - 机器电池检测功能，失去墙插自动提醒管理员
 
-  - 2023.12.1
-    - 改善了功能呼叫结构
-    - 新增功能:
-      - 机器电池检测功能，失去墙插自动提醒管理员
+- 2023.11.25
+  - 修复了rss推送功能的
+    ```
+    题@个:
+    这       
+    Link: 问
+    ```
 
-  - 2023.11.25
-    - 修复了rss推送功能的
-      ```
-      题@个:
-      这       
-      Link: 问
-      ```
+- 2023.10.18
+  - 修复功能: pjskpf, amikaiden
+  - 新增功能:
+    - pwhat [alias] pjsk别名库
+    - pinfo [ID | Title] pjsk歌曲信息
+    - pcinfo [ID] pjsk谱面信息
 
-  - 2023.10.18
-    - 修复功能: pjskpf, amikaiden
-    - 新增功能:
-      - pwhat [alias] pjsk别名库
-      - pinfo [ID | Title] pjsk歌曲信息
-      - pcinfo [ID] pjsk谱面信息
+- 2023.9.14
+  - 修复rss推送会重复推送，动态删除导致不再判断刷新的问题
 
-  - 2023.9.14
-    - 修复rss推送会重复推送，动态删除导致不再判断刷新的问题
+- 2023.9.11
+  - 增加rss推送功能
+  - 新增randmai函数 随机抽取maimai歌曲
+  - 新增mnew函数 显示当前maimai版本所有歌曲
+  - 修复拍一拍相关
 
-  - 2023.9.11
-    - 增加rss推送功能
-    - 新增randmai函数 随机抽取maimai歌曲
-    - 新增mnew函数 显示当前maimai版本所有歌曲
-    - 修复拍一拍相关
-
-  - 2023.08.20
-    - 适配wxAPI更新，wx版本更新至至3.9.2.23
+- 2023.08.20
+  - 适配wxAPI更新，wx版本更新至至3.9.2.23
 
 </details>
 
