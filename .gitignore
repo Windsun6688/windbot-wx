@@ -141,4 +141,7 @@ reference/
 *.db
 *.json
 
+# MacOS Files
+.DS_Store
+
 
