@@ -1274,7 +1274,34 @@ def mai_plate(datalist,callerid,roomid = None):
 		ws.send(send_txt_msg(f'您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: {BOT_GC_TRIGGER} bind mai xxxxx',roomid))
 		return
 
-	reply_txt = mai_plate_status(gamertag, datalist)
+	if datalist[0] == "l":
+		reply_txt = mai_plate_left(gamertag,datalist[1:])
+	else:
+		reply_txt = mai_plate_status(gamertag, datalist)
+	ws.send(send_txt_msg(reply_txt,roomid))
+	return
+
+# Query Scores of a Single Song
+def mai_single(datalist, callerid, roomid = None):
+	conn_thread = sqlite3.connect('./windbotDB.db')
+	cur_thread = conn_thread.cursor()
+
+	if len(datalist) < 1:
+		ws.send(send_txt_msg('请提供要查询的单曲SID。', roomid))
+		return
+	elif len(datalist) > 1:
+		ws.send(send_txt_msg("WB只能查询一曲的数据。", roomid))
+		return
+
+	gamertag = sql_fetch(cur_thread,'Users',['maiID'],\
+						f"wxid = '{callerid}'")[0][0]
+
+	if gamertag == '-1':
+		ws.send(send_txt_msg(f'您未绑定maimai查分器ID。请使用bind指令绑定。\n请注意，请绑定您在https://www.diving-fish.com/maimaidx/prober/中的用户名。\n示例: {BOT_GC_TRIGGER} bind mai xxxxx',roomid))
+		return
+
+	reply_txt = mai_single_score(gamertag,int(datalist[0]))
+	print(reply_txt)
 	ws.send(send_txt_msg(reply_txt,roomid))
 	return
 
@@ -1768,6 +1795,7 @@ if __name__ == "__main__":
 		'minfo': mai_music_search,
 		'mwhat':mai_alias_search,
 		'mnew': mai_music_new,
+		'mbpm': mai_music_bpm,
 		'randmai': mai_music_random,
 		'mupdate': mai_update,
 
@@ -1791,6 +1819,7 @@ if __name__ == "__main__":
 		"parrot": party_parrot,
 		"mb50": mai_best,
 		"mplate": mai_plate,
+		"mgrade": mai_single,
 		"pjskev": pjsk_curr_event,
 		"whatanime": anime_by_url,
 		"cmd": cmd_trigger

@@ -7,17 +7,8 @@ from ..sqlHelper import *
 
 static = os.path.join(resource_root,'maiCN')
 material = os.path.join(static,'material')
+mai_func_dir = os.path.dirname(os.path.realpath(__file__))
 
-scoreRank = ['d', 'c', 'b', 'bb', 'bbb', 'a', 'aa', 'aaa',\
-            's', 's+', 'ss', 'ss+', 'sss', 'sss+']
-comboRank = ['fc', 'fc+', 'ap', 'ap+']
-combo_rank = ['fc', 'fcp', 'ap', 'app']
-full_combo_rank = ['[FULL COMBO] ','[FULL COMBO+] ',\
-                    '[ALL PERFECT] ','[ALL PERFECT+] ']
-syncRank = ['fs', 'fs+', 'fdx', 'fdx+']
-sync_rank = ['fs', 'fsp', 'fsd', 'fsdp']
-full_sync_rank = ['<FULL SYNC> ','<FULL SYNC+> ',\
-                    '<FULL SYNC DX> ','<FULL SYNC DX+> ']
 diffs = ['Basic', 'Advanced', 'Expert', 'Master', 'Re:Master']
 levelList = ['1', '2', '3', '4', '5', '6', '7', '7+', '8', '8+', '9','9+',\
         '10', '10+', '11', '11+', '12', '12+', '13', '13+', '14', '14+', '15']
@@ -27,6 +18,15 @@ BaseRa = [0.0, 5.0, 6.0, 7.0, 7.5, 8.5, 9.5, 10.5, 12.5, 12.7,\
                     13.0, 13.2, 13.5, 14.0]
 BaseRaSpp = [7.0, 8.0, 9.6, 11.2, 12.0, 13.6, 15.2, 16.8, 20.0,\
                     20.3, 20.8, 21.1, 21.6, 22.4]
+
+config = json.load(open("config.json", 'r', encoding='utf-8'))
+dev_token = config["mai_dev_token"]
+if dev_token == "":
+    output("Continuing Without Developer Token",\
+            'WARNING',background = 'WHITE')
+
+MAI_API = "https://www.diving-fish.com/api/maimaidxprober"
+MAI_ALIAS_API = "https://api.yuzuai.xyz/maimaidx"
 
 JPVER_2_CNVER = {
     "maimai": "maimai",
@@ -50,16 +50,6 @@ JPVER_2_CNVER = {
     "maimai でらっくす UNiVERSE PLUS": "舞萌DX2022",
     "maimai でらっくす FESTiVAL": "舞萌DX2023",
     "maimai でらっくす FESTiVAL PLUS": "舞萌DX2023",
-}
-
-API_ALIAS = {
-    'all': 'MaimaiDXAlias',
-    'songs': 'GetSongs',
-    'alias': 'GetSongsAlias',
-    'status': 'GetAliasStatus',
-    'apply': 'ApplyAlias',
-    'agree': 'AgreeUser',
-    'end': 'GetAliasEnd'
 }
 
 PLATE_2_VER = {
@@ -94,21 +84,57 @@ PLATE_2_VER = {
     '祝': 'maimai でらっくす FESTiVAL PLUS'
 }
 
-######## User Diving-Fish Data Functions ########
-def mai_api_get(gamertag: str, plate: list = None, b50: bool = False):
+######## API Functions ########
+def mai_api_query_user(gamertag: str, func:str, plates: list = None):
+    """
+    func 获取数据种类有:
+    - plate 获取指定代的游玩数据
+    - b50 获取b50数据
+    """
+
     j = {
         'username': gamertag,
     }
-    if b50:
+
+    if func == "plate":
+        j['version'] = plates
+        method = f"/query/plate"
+    elif func == "b50":
         j['b50'] = True
-        j['mode'] = 'player'
-    elif plate:
-        j['version'] = plate
-        j['mode'] = 'plate'
-    url = f"https://www.diving-fish.com/api/maimaidxprober/query/{j['mode']}"
+        method = f"/query/player"
+    else:
+        return 0
+
+    url = MAI_API + method
 
     resp = requests.post(url,json = j)
-    # print(resp)
+    if resp.status_code == 200:
+        data = resp.json()
+        return data
+    elif resp.status_code == 403:
+        return -2
+    elif resp.status_code == 400:
+        return -1
+    else:
+        return 0
+
+def mai_api_query_user_dev(gamertag: str, func: str):
+    """
+    func 获取数据种类有:
+    - records: 全部数据
+    """
+    if func == "records":
+        method = "/dev/player/records"
+    else:
+        return 0
+
+    url = MAI_API + method
+
+    params = {'username': gamertag}
+    headers = {'developer-token': dev_token}
+
+    resp = requests.get(url, headers = headers, params = params)
+
     if resp.status_code == 403:
         return -2
     elif resp.status_code == 400:
@@ -120,6 +146,164 @@ def mai_api_get(gamertag: str, plate: list = None, b50: bool = False):
 
     return data
 
+def mai_api_data_get(func:str):
+    """
+    func 获取数据种类有:
+    - music 获取曲目数据
+    - chart 获取单曲数据
+    - ranking 获取查分器ranking排行榜
+    """
+    if func == 'music':
+        method = f"/music_data"
+    elif func == 'chart':
+        method = f"/chart_stats"
+    elif func == 'ranking':
+        method = f"/rating_ranking"
+    else:
+        return 0
+
+    url = MAI_API + method
+
+    resp = requests.get(url)
+
+    if resp.status_code == 200:
+        data = resp.json()
+        return data
+    elif resp.status_code == 403:
+        return -2
+    elif resp.status_code == 400:
+        return -1
+    else:
+        return 0
+
+def mai_alias_api_get(func:str, sid:int = None):
+    """
+    func 获取数据种类:
+    - alias 所有别名
+    - id2alias 返回id对应的别名
+    - aliastatus 正在进行的别名投票
+    - aliasend 五分钟内结束的别名投票
+    - music 曲目数据
+    - charts 曲目数据
+    """
+    params = {}
+
+    if func == "alias":
+        method = f"/maimaidxalias"
+    elif func == "id2alias":
+        method = f"/getsongsalias"
+        params["id"] = sid
+    elif func == 'aliastatus':
+        method = f"/getaliasstatus"
+    elif func == 'aliasend':
+        method = f"/getaliasend"
+    elif func == 'music':
+        method = f"/getmaimaidxmusic"
+    elif func == 'charts':
+        method = f"/getmaimaidxchartstats"
+    else:
+        return 0
+
+    url = MAI_ALIAS_API + method
+
+    resp = requests.get(url, params = params)
+
+    if resp.status_code == 200:
+        data = resp.json()
+        return data
+    elif resp.status_code == 403:
+        return -2
+    elif resp.status_code == 400:
+        return -1
+    else:
+        return 0
+
+######## Resources Update & Local Data Retrieval ########
+def mai_music_get(local: bool = False) -> Tuple[dict,bool]:
+    """
+    Not Local: Get Song Data From Diving Fish Server
+    Local: Read Song Data From Local File
+    """
+    success = True
+    if not local:
+        songs = mai_api_data_get("music")
+
+        if isinstance(songs,list):
+            with open(os.path.join(static, 'music_data.json'), 'w', \
+                    encoding='utf-8') as f:
+                f.write(json.dumps(songs, ensure_ascii=False, indent=4))
+        else:
+            output('maimaiDX曲目数据获取失败,切换至本地暂存文件',\
+                    'WARNING',background = 'WHITE')
+            local = True
+            success = False
+    if local:
+        with open(os.path.join(static, 'music_data.json'), 'r', \
+                encoding='utf-8') as f:
+            songs = json.loads(f.read())
+
+    return (songs, success)
+
+def mai_chartstats_get(local: bool = False) -> Tuple[dict,bool]:
+    """
+    Not Local: Get Chart Stats From Diving Fish Server
+    Local: Read Chart Stats From Local File
+    """
+    success = True
+    if not local:
+        chart_stats = mai_api_data_get("chart")
+
+        if isinstance(chart_stats, dict):
+            with open(os.path.join(static, 'chart_stats.json'), 'w', \
+                    encoding='utf-8') as f:
+                f.write(json.dumps(chart_stats, ensure_ascii=False, indent=4))
+        else:
+            output('maimaiDX谱面数据获取失败,切换至本地暂存文件',\
+                    'WARNING',background = 'WHITE')
+            local = True
+            success = False
+    if local:
+        with open(os.path.join(static, 'chart_stats.json'), 'r', \
+                encoding='utf-8') as f:
+            chart_stats = json.loads(f.read())
+
+    return (chart_stats, success)
+
+def mai_alias_get(local: bool = False) -> Tuple[dict,bool]:
+    """
+    Not Local: Get Song Alias From yuzuai Server
+    Local: Read Alias From Local File
+    """
+    success = True
+    if not local:
+        alias = mai_alias_api_get("alias")
+
+        if isinstance(alias, dict):
+            with open(os.path.join(static, 'song_alias.json'), 'w',\
+                    encoding='utf-8') as f:
+                f.write(json.dumps(alias, ensure_ascii=False, indent=4))
+        else:
+            output('maimaiDX歌曲别名数据获取失败,切换为本地暂存文件',\
+                    'WARNING',background = 'WHITE')
+            local = True
+            success = False
+    if local:
+        with open(os.path.join(static,'song_alias.json'), 'r',\
+                encoding='utf-8') as f:
+            alias = json.loads(f.read())
+
+    return (alias, success)
+
+def mai_update(datalist,callerid,roomid = None):
+    status = ["ERROR","OK"]
+    resp = "更新结果:\n"
+    resp += f"曲目: {status[int(mai_music_get()[1])]}\n"
+    resp += f"谱面: {status[int(mai_chartstats_get()[1])]}\n"
+    resp += f"别名: {status[int(mai_alias_get()[1])]}\n"
+
+    return [resp]
+
+######## Helper Functions ########
 def mai_process_record(playrecord: dict):
     title = playrecord['title']
     level = playrecord['level_label']
@@ -137,7 +321,7 @@ def mai_process_record(playrecord: dict):
     star = dxscore_2_star(racc,song_id,diff)
     return [title,level,diff,song_id,chart_const,chart_type,acc,racc,star,rate,rating,fc,fs]
 
-######## Plate Check ########
+######## Plate Checking  ########
 def mai_plate_status(gamertag,datalist):
     # Translate phrase to plate plan
     versions,plan = mai_phrase_2_plate(datalist[0])
@@ -146,7 +330,7 @@ def mai_plate_status(gamertag,datalist):
         return f"不存在该名牌版: {datalist[0]}"
 
     try:
-        usr_data = mai_api_get(gamertag, plate = versions)
+        usr_data = mai_api_query_user(gamertag, "plate", versions)
     except:
         return "和Diving-Fish服务器通信失败。请稍后再试。"
 
@@ -227,6 +411,61 @@ def mai_plate_status(gamertag,datalist):
 
     return reply_txt
 
+def mai_plate_left(gamertag, datalist):
+    # Read query_cnt
+    if len(datalist) < 2:
+        query_cnt = 15
+        plate = datalist[0]
+    else:
+        query_cnt = int(datalist[0])
+        plate = datalist[1]
+    # Translate phrase to plate plan
+    versions,plan = mai_phrase_2_plate(plate)
+
+    # No such plate or plan exists
+    if (versions,plan) == (-1,-1):
+        return f"不存在该名牌版: {plate}"
+
+    try:
+        usr_data = mai_api_query_user(gamertag, "plate", versions)
+    except:
+        return "和Diving-Fish服务器通信失败。请稍后再试。"
+
+    # Getting Data Failed
+    if isinstance(usr_data,str):
+        return usr_data
+
+    usr_plate_data = usr_data['verlist']
+
+    # Check Remaining Songs
+    remaining, remaining_hard = mai_plate_check(usr_plate_data,versions,plan)
+
+    # Include Re:Master or Not
+    include_rem = (plate[0] in ['舞','霸'])
+
+    query_cnt = min(len(remaining_hard),query_cnt)
+
+    # Concat the reply text
+    reply_txt = f"{gamertag} - 名牌版『{plate}』\n"
+    reply_txt += f"剩余曲目{query_cnt}选(13.6以上定数倒序):\n"
+    final_remaining_hard = []
+
+    if not include_rem:
+        for song in remaining_hard:
+            if song[2] != diffs[4]:
+                final_remaining_hard.append(song)
+    else:
+        final_remaining_hard = remaining_hard
+
+    for s in range(query_cnt):
+        song = final_remaining_hard[s]
+        s_id = song[0]
+        s_title = song[1]
+        s_diff = song[2]
+        s_ds = song[3]
+        reply_txt += f"[{s_diff} {s_ds}] {s_title} (ID: {s_id})\n"
+    return reply_txt
+
 def mai_plate_check(usr_plate_data:list,versions: list,plan:int):
     '''
     plan对照
@@ -235,7 +474,7 @@ def mai_plate_check(usr_plate_data:list,versions: list,plan:int):
     4: 霸者
     '''
     # Load Songs Locally
-    mai_songs = mai_music_get(local = True)
+    mai_songs = mai_music_get(local = True)[0]
 
     # Initialize Lists to track Remaining / Played
     remain_bas = []
@@ -278,6 +517,28 @@ def mai_plate_check(usr_plate_data:list,versions: list,plan:int):
             # Skip ジングルベル
             if song_id == 70:
                 continue
+
+            # Remove Append Remaster Songs when querying 舞 Series
+            append_remas_id = [
+                                47,  # 源平大戦絵巻テーマソング
+                                133, # We Gonna Party
+                                144, # Air's Gravity
+                                219, # 記憶、記録
+                                239, # System “Z”
+                                240, # Beat of Getting EntangledWBW
+                                364, # D✪N’T ST✪P R✪CKIN'
+                                367, # Dragoon
+                                378, # planet dancer
+                                389, # FLOWER
+                                463, # FEEL the BEATS
+                                464, # Revive the Rave
+                                472, # アージェントシンメトリー
+                                629, # Limit Break
+                                704, # SPILL OVER COLORS
+            ]
+            if song_id in append_remas_id:
+                song['ds'] = song['ds'][:-1]
+
             song_title = song['title']
             # Check all diffs for this song
             diff_cnt = 0
@@ -350,143 +611,56 @@ def mai_phrase_2_plate(phrase: str) -> (list,str):
 
     return (version,plan_num)
 
-######## Resources Update ########
-def mai_music_get(local: bool = False):
-    if local:
-        with open(os.path.join(static, 'music_data.json'), 'r', \
-                encoding='utf-8') as f:
-            songs = json.loads(f.read())
-    else:
-        # SONG DETAILS
-        resp = requests.get(\
-                'https://www.diving-fish.com/api/maimaidxprober/music_data')
-        if resp.status_code != 200:
-            output('maimaiDX曲目数据获取失败,切换至本地暂存文件',\
-                    'WARNING',background = 'WHITE')
-            with open(os.path.join(static, 'music_data.json'), 'r', \
-                    encoding='utf-8') as f:
-                songs = json.loads(f.read())
-        else:
-            songs = resp.json()
-            with open(os.path.join(static, 'music_data.json'), 'w', \
-                    encoding='utf-8') as f:
-                f.write(json.dumps(songs, ensure_ascii=False, indent=4))
-    return songs
-
-def mai_chartstats_get(local: bool = False):
-    if local:
-        with open(os.path.join(static, 'chart_stats.json'), 'r', \
-                encoding='utf-8') as f:
-            stats = json.loads(f.read())
-    else:
-        # CHART DETAILS
-        resp = requests.get(\
-                'https://www.diving-fish.com/api/maimaidxprober/chart_stats')
-        if resp.status_code != 200:
-            output('maimaiDX谱面数据获取失败,切换至本地暂存文件',\
-                    'WARNING',background = 'WHITE')
-            with open(os.path.join(static, 'chart_stats.json'), 'r', \
-                    encoding='utf-8') as f:
-                stats = json.loads(f.read())
-        else:
-            stats = resp.json()
-            with open(os.path.join(static, 'chart_stats.json'), 'w', \
-                    encoding='utf-8') as f:
-                f.write(json.dumps(stats, ensure_ascii=False, indent=4))
-    return stats
-
-def mai_alias_get(mode: str = 'all',params: dict = None,local: bool = False):
-    """
-    - `all`: 所有曲目的别名
-    - `songs`: 该别名的曲目
-    - `alias`: 该曲目的所有别名
-    - `status`: 正在进行的别名申请
-    - `end`: 已结束的别名申请
-    """
-    if local:
-        with open(os.path.join(static, 'song_alias.json'), 'r', encoding='utf-8') as f:
-                data = json.loads(f.read())
-        return data
-
+######## Single Score ########
+def mai_single_score(gamertag:str, sid:int):
     try:
-        resp = requests.get(f'https://api.yuzuai.xyz/maimaidx/{API_ALIAS[mode]}',params = params)
+        usr_data = mai_api_query_user_dev(gamertag, "records")
+    except:
+        return "和Diving-Fish服务器通信失败。请稍后再试。"
+    song_info = mai_music_by_id(sid)
+    usr_single_grade = [grade for grade in usr_data["records"]\
+                        if grade['song_id'] == sid]
 
-        if resp.status_code != 200:
-            output('maimaiDX歌曲别名数据获取失败,切换为本地暂存文件','WARNING',background = 'WHITE')
-            with open(os.path.join(static, 'song_alias.json'), 'r', encoding='utf-8') as f:
-                data = json.loads(f.read())
-        else:
-            data = resp.json()
-            with open(os.path.join(static, 'song_alias.json'), 'w', encoding='utf-8') as f:
-                f.write(json.dumps(data, ensure_ascii=False, indent=4))
-    except Exception as e:
-        output(f'获取别名时发生错误: {e}','WARNING',background = 'WHITE')
-        return -1
+    reply_txt = f"{gamertag} - 单曲『{song_info['title']}』成绩:\n"
 
-    return data
+    # For each level the song has
+    for i in range(len(song_info["ds"])):
+        diff = diffs[i]
+        ds = song_info["ds"][i]
+        achievement = "无数据"
+        for g in usr_single_grade:
+            if g['level_index'] == i:
+                achievement = str(g['achievements']) + "%"
 
-def mai_update(datalist,callerid,roomid = None):
-    resp = "更新结果:\n"
-    m_c_err = False
-    try:
-        mai_music_get()
-        mai_chartstats_get()
-    except Exception as e:
-        m_c_err = True
-        resp += "曲目&谱面: ERROR\n"
-    if not m_c_err:
-        resp += "曲目&谱面: OK\n"
+        reply_txt += f"- [{diff} {ds}] {achievement}\n"
+    return reply_txt
 
-    if mai_alias_get() == -1:
-        resp += "别名: 错误"
-    else:
-        resp += "别名: OK"
-    return [resp]
-
-######## Music Functions ########
+######## Music Functions  ########
 def mai_music_search(datalist,callerid,roomid = None):
-    # 载入数据
-    mai_songs = mai_music_get(local = True)
-
-    results = []
     # Fuzzy text search
     if datalist[0].lower() == 'f':
-        keyword = ''
-        for word in datalist[1:]:
-            keyword += (word + ' ')
-        keyword = keyword[:-1]
-        for song in mai_songs:
-            # print(song)
-            if fuzz.QRatio(keyword,song['title']) >= 65:
-                results.append(song)
+        keyword = " ".join(datalist[1:])
+        results = mai_music_by_fuzzy_title(keyword,65)
+    # Other Searches
     else:
-        keyword = ''
-        for word in datalist:
-            keyword += (word + ' ')
-        keyword = keyword.strip()
+        keyword = " ".join(datalist)
 
         # If user uses ID search
         if keyword.isnumeric():
-            for song in mai_songs:
-                if song['id'] == keyword:
-                    results.append(song)
-                    break
+            results = []
+            results.append(mai_music_by_id(int(keyword)))
 
-        # Precise Text Search
+        # (A Bit More) Precise Text Search
         else:
-            for song in mai_songs:
-                if fuzz.QRatio(keyword,song['title']) >= 90:
-                    results.append(song)
-                    break
+            results = mai_music_by_fuzzy_title(keyword,90)
 
     if len(results) == 0:
-        return ['没有搜寻到结果,或搜索模式关键词错误。']
+        return [f'没有搜寻到结果。您查找了:{keyword}']
     elif len(results) > 5:
-        return ['请尝试优化搜索词。']
+        return ['结果过多。请尝试优化搜索词。']
 
     reply_txt = f"共找到以下{len(results)}个结果:"
     for s in results:
-        # output(s,background = 'MINT')
         sid = s['id']
         is_DX = s['type']
         title = s['title']
@@ -506,33 +680,39 @@ def mai_music_search(datalist,callerid,roomid = None):
         if len(ds) == 5:
             remas_txt = f' | ReMas{ds[4]}\n'
 
-        reply_txt += f"\n[{is_DX}]{new_txt} {artist} - {title}\n-版本:{CN_version} | 分区:{category} | BPM:{bpm}\n--Bas{ds[0]} | Adv{ds[1]} | Exp{ds[2]} | Mas{ds[3]}{remas_txt}---Song ID: {sid}"
+        reply_txt += f"\n[{is_DX}]{new_txt} {artist} - {title}\n-版本:{CN_version} | 分区:{category} | BPM:{bpm}\n--Bas{ds[0]} | Adv{ds[1]} | Exp{ds[2]} | Mas{ds[3]}{remas_txt}---Song ID: {sid}\n"
     return [reply_txt]
 
 def mai_music_by_id(song_id: int):
-    songs = mai_music_get(True)
+    songs = mai_music_get(local = True)[0]
     for s in songs:
         if s["id"] == str(song_id):
             return s
     return -1
 
-def mai_music_by_title(title: str):
-    songs = mai_music_get(True)
+def mai_music_by_fuzzy_title(title: str, QRatio: int):
+    songs = mai_music_get(local = True)[0]
+    results = []
     for s in songs:
-        if s["title"] == title:
-            return s
-    return -1
+        if fuzz.QRatio(title.lower(),s['title'].lower()) >= QRatio:
+            results.append(s)
+    return results
 
-def mai_music_by_alias(alias: str):
-    pass
+def mai_music_by_bpm(bpm: int):
+    songs = mai_music_get(local = True)[0]
+    results = []
+    for s in songs:
+        if s["basic_info"]["bpm"] == bpm:
+            results.append(s)
+    return results
 
 def mai_music_random(datalist,callerid,roomid = None):
     # If no diff specified, random over the whole collection
     if len(datalist) == 0:
-        songs = mai_music_get(True)
+        songs = mai_music_get(True)[0]
     # If a number of diffs are specified
     else:
-        collection = mai_music_get(True)
+        collection = mai_music_get(True)[0]
         songs = []
         for s in collection:
             for diff in s['level']:
@@ -547,7 +727,7 @@ def mai_music_random(datalist,callerid,roomid = None):
     return [reply_txt]
 
 def mai_music_new(datalist,callerid,roomid = None):
-    songs = mai_music_get(local = False)
+    songs = mai_music_get(local = False)[0]
     reply_txt = "当前CN最新版本歌曲列表:\n"
     has_new = False
     for s in songs:
@@ -559,9 +739,35 @@ def mai_music_new(datalist,callerid,roomid = None):
     else:
         return ['当前还没有新歌。']
 
+def mai_music_bpm(datalist,callerid,roomid = None):
+    if len(datalist) < 1:
+        return ['请提供需要查询的BPM。']
+    elif len(datalist) > 1:
+        return ['WB只能查询一个BPM。']
+
+    bpm = datalist[0]
+    if not bpm.isnumeric():
+        return [f'请提供一个数字。\n您正在尝试查询:{bpm}']
+
+    bpm = int(bpm)
+    results = mai_music_by_bpm(bpm)
+    results_cnt = len(results)
+
+    if results_cnt == 0:
+        reply_txt = f"没有{bpm}BPM的歌曲。"
+        return [reply_txt]
+
+    reply_txt = f"在{bpm}BPM的歌曲共有{results_cnt}首:\n"
+    for i in range(results_cnt):
+        song_info = results[i]
+        song_title = song_info["title"]
+        song_id = song_info["id"]
+        reply_txt += f"{i+1}. {song_title} (ID:{song_id})\n"
+    return [reply_txt]
+
 def mai_alias_search(datalist,callerid,roomid = None):
     # 载入数据
-    song_alias = mai_alias_get(local = True)
+    song_alias = mai_alias_get(local = True)[0]
     if song_alias == -1:
         return ['加载别名时出现未知错误。']
 
@@ -917,7 +1123,7 @@ def best_2_image(output: Image.Image,data: list,isOld: bool):
     return output
 
 def draw_best_image(gamertag: str):
-    user_data = mai_api_get(gamertag,b50 = True)
+    user_data = mai_api_query_user(gamertag, "b50")
 
     if user_data == -2:
         return -2
