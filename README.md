@@ -44,9 +44,28 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 <details>
   <summary>点我展开 Click To Expand</summary>
 
+- 2024.01.14
+
+
+    - 新增功能:
+        - mgrade \<sid> 根据ID查询水鱼网maimai单曲成绩
+        - mbpm \<bpm> 查找maimai中特定BPM的歌曲
+
+    - 更新功能:
+        - mplate新增参数 l[eft] 获取的剩余曲目列表
+        --使用结构: @WindBot mplate [l] [remaining_list_len] \<plate>
+        ---使用示例: @WindBot mplate l 20 舞将
+
+        - minfo在使用曲名查找时不会对大小写更加不敏感, 增加了模糊搜索的容错率
+
+    - 修复功能:
+
+        - mplate在计算舞系名牌版时不会计入DX后的“追加Re:Master谱面” 
+
 - 2024.01.08
+
     - 更新功能：
-        - rand <item1> <item2> [item3]...... 随机抽取项目
+        - rand \<item1> \<item2> [item3]...... 随机抽取项目
     - 修复功能：
         - mb50 rating框颜色不正确的问题
 
