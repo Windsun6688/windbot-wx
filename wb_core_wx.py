@@ -61,7 +61,7 @@ class Core(object):
             pass
 
         start_time = time.strftime("%Y-%m-%d %X")
-        self.msgr.send_txt_msg(f"启动完成\n{now}", self.SUDO_LIST[0])
+        self.msgr.send_txt_msg(f"启动完成\n{start_time}", self.SUDO_LIST[0])
 
         # ASCII Art Credit: FigLet & Me
         start_ascii_art = """
