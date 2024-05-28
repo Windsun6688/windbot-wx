@@ -8,7 +8,10 @@ from wb_msgr_wx import Messenger
 import os
 import json
 import time
-from sys import sys.exit
+import sys
+
+# Third Party Imports
+import rel
 
 class Core(object):
     """Windbot Core Bridging Between Modules and wxapi Messenger"""
@@ -54,11 +57,11 @@ class Core(object):
         # self.msgr.get_wxuser_list()
 
         # Update Admin List
-        for wxid in SUDO_LIST:
+        for wxid in self.SUDO_LIST:
             pass
 
         start_time = time.strftime("%Y-%m-%d %X")
-        self.msgr.send_txt_msg(f"启动完成\n{now}", SUDO_LIST[0])
+        self.msgr.send_txt_msg(f"启动完成\n{now}", self.SUDO_LIST[0])
 
         # ASCII Art Credit: FigLet & Me
         start_ascii_art = """
@@ -117,7 +120,7 @@ class Core(object):
                            self.on_error,\
                            self.on_close)
 
-    def output(msg,logtype = 'SYSTEM',mode = 'DEFAULT',background = 'DEFAULT'):
+    def output(self, msg, logtype='SYSTEM', mode ='DEFAULT', background='DEFAULT'):
         LogColor = {
             'SYSTEM': '034',
             'ERROR': '037',
@@ -174,14 +177,14 @@ class Core(object):
 
 # Main Invoker on Program Run
 def main():
-	# Set dispatcher to automatic reconnection
+    # Set dispatcher to automatic reconnection
     # 5 second reconnect delay if connection closed unexpectedly
     WB_MSGR = Messenger()
     WB_CORE = Core(WB_MSGR)
 
-	WB_MSGR.ws.run_forever(dispatcher = rel, reconnect = 5)
-	rel.signal(2, rel.abort)  # Keyboard Interrupt
-	rel.dispatch()
+    WB_MSGR.ws.run_forever(dispatcher = rel, reconnect = 5)
+    rel.signal(2, rel.abort)  # Keyboard Interrupt
+    rel.dispatch()
 
 if __name__ == "__main__":
     main()
