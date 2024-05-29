@@ -75,7 +75,7 @@ class SQLHelper(object):
         conn.close()
 
     # SQL Select Wrapper.
-    def fetch(self, table, cols = None, condition = None, cur = None): -> List:
+    def fetch(self, table, cols = None, condition = None, cur = None) -> List:
         cols = ['*'] if cols == None else cols
 
         str_cols = ", ".join(cols).replace('\'', '')
