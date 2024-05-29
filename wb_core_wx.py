@@ -340,7 +340,7 @@ class Handler(object):
 
         # Normal Messages go through a keyword trigger
         isRoom = bool(roomid)
-        handle_recv_keyword(message, msgJson["wxid"], isRoom)
+        self.handle_recv_keyword(message, msgJson["wxid"], isRoom)
 
     # Helper of handle_recv_msg. Checks Keyword Triggers.
     def handle_recv_keyword(self, keyword, destination, isRoom) -> None: #@TODO
