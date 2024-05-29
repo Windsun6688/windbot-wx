@@ -364,7 +364,7 @@ class Handler(object):
         output("CALLED")
 
     # Character Q2B
-    def Q2B(self, uchar):
+    def Q2B(self, uchar) -> str:
         """单个字符 全角转半角"""
         inside_code = ord(uchar)
         if inside_code == 0x3000:
@@ -376,7 +376,7 @@ class Handler(object):
         return chr(inside_code)
 
     # String Q2B
-    def stringQ2B(self, ustring):
+    def stringQ2B(self, ustring) -> str:
         """把字符串全角转半角"""
         return "".join([Q2B(uchar) for uchar in ustring])
     
@@ -447,7 +447,7 @@ class Handler(object):
         output(j)
 
     # Handles a single User's info. @TODO
-    def handle_personal_info(self, j):
+    def handle_personal_info(self, j) -> None:
         output(j)
 
 # Custom Print Wrapper
