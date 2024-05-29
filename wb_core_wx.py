@@ -66,6 +66,8 @@ class Core(object):
         self.FUNTOOL_PORT = wb_config["wxPort"]
 
         # WebSocket Server Return Msg Types
+        self.WS_POSTCHECK_MSG = 5
+
         self.RECV_TXT_MSG = 1
         self.RECV_PIC_MSG = 3
         self.RECV_TXT_CITE_MSG = 49
@@ -135,6 +137,7 @@ class Core(object):
 
         # Case Switch 
         action = {
+            self.WS_POSTCHECK_MSG: self.hdlr.handle_ws_postcheck,
             self.CHATROOM_MEMBER_NICK: self.hdlr.handle_chat_nick,
             self.AT_MSG: self.hdlr.handle_at_msg,
             self.DEBUG_SWITCH: print,
@@ -381,6 +384,10 @@ class Handler(object):
         """把字符串全角转半角"""
         return "".join([Q2B(uchar) for uchar in ustring])
     
+    # Handles the WebSocket Server Post Check.
+    def handle_ws_postcheck(self, j) -> None:
+        output("WebSocket Server CHECKED")
+
     #################### USER DB RELATED FUNCTIONS BELOW #################### 
     # Handles the bot account's contact list.
     def handle_wxuser_list(self, j) -> None:
