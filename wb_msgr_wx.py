@@ -30,10 +30,10 @@ class Messenger(object):
     def _ws_init(self, WS_IP:str, WS_PORT:int, on_open, on_msg, on_err, on_close):
         ws_server = f"ws://{WS_IP}:{WS_PORT}"
         self.ws = websocket.WebSocketApp(ws_server,\
-							on_open = on_open,\
-							on_message = on_msg,\
-							on_error = on_err,\
-							on_close = on_close)
+                            on_open = on_open,\
+                            on_message = on_msg,\
+                            on_error = on_err,\
+                            on_close = on_close)
 
     # Provides a time-based ID for websocket
     def getid(self) -> str:

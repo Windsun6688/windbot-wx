@@ -50,7 +50,7 @@ class SQLHelper(object):
             return False
 
         # Insert Row
-		insert_cmd = f"INSERT INTO {table}({rows}) VALUES({values})"
+        insert_cmd = f"INSERT INTO {table}({rows}) VALUES({values})"
         
         # Execute & Commit
         conn.execute(insert_cmd)

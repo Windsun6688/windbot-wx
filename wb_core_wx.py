@@ -94,7 +94,7 @@ class Core(object):
     def on_open(self, ws):
         # Initialize WB DB (If not yet)
         self.wb_db._usr_table_init()
-        self.wb_db._group_overview_table_init()	
+        self.wb_db._group_overview_table_init() 
 
         # Refresh User Data
         self.msgr.get_wxuser_list()
