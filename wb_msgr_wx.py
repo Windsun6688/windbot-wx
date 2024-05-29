@@ -8,9 +8,6 @@ import json
 import websocket
 import time
 
-# Local Imports
-from wb_core_wx import output
-
 # Initialize WebSocket Settings
 websocket._logging._logger.level = -99
 # websocket.enableTrace(True)
