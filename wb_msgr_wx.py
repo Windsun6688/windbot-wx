@@ -8,7 +8,10 @@ import json
 import websocket
 import time
 
-# Initialize Core Settings
+# Local Imports
+from wb_core_wx import output
+
+# Initialize WebSocket Settings
 websocket._logging._logger.level = -99
 # websocket.enableTrace(True)
 
@@ -71,6 +74,7 @@ class Messenger(object):
             'ext': 'null'
         }
         self.ws.send(json.dumps(ws_data))
+        output(f'{msg} -> {wxid}','SEND')
 
     # Tells websocket wxapi to send an attachment.
     def send_attatch(self, filepath:str, wxid:str = 'null') -> None:
@@ -84,6 +88,7 @@ class Messenger(object):
             'ext': 'null'
         }
         self.ws.send(json.dumps(ws_data))
+        output(f'File @ {filepath} -> {wxid}','SEND')
 
     # Tells websocket wxapi to send a (picture) attachment. (Rarely Used)
     def send_pic(self, filepath:str, wxid:str = 'null') -> None:
@@ -97,6 +102,7 @@ class Messenger(object):
             'ext': 'null'
         }
         self.ws.send(json.dumps(ws_data))
+        output(f"Media @ {filepath} -> {wxid}",'SEND')
 
     # Tells websocket wxapi to fetch nicknames of a user in a room.
     def get_chat_nick_p(self, wxid:str, roomid:int) -> None:
