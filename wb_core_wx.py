@@ -3,7 +3,7 @@
 
 # Local Imports
 from wb_msgr_wx import Messenger
-from wb_msgr_wx import SQLHelper
+from wb_sql_wx import SQLHelper
 from modules.core.main import CoreFunctions
 
 # Standard Lib Imports
