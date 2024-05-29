@@ -75,7 +75,7 @@ class SQLHelper(object):
         conn.close()
 
     # SQL Select Wrapper.
-    def fetch(self, table, cols = None, condition = None, cur = None) -> List:
+    def fetch(self, table, cols = None, condition = None, cur = None) -> list:
         cols = ['*'] if cols == None else cols
 
         str_cols = ", ".join(cols).replace('\'', '')
@@ -101,7 +101,7 @@ class SQLHelper(object):
         return [i for i in result]
 
     # SQL Fuzzy Match.
-    def match(self, table, condition_col, keyword, col = None) -> List:
+    def match(self, table, condition_col, keyword, col = None) -> list:
         cols = ['*'] if cols == None else cols
 
         conn = self.connect()
