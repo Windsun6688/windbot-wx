@@ -16,7 +16,7 @@ class SQLHelper(object):
          return connection.cursor()
 
     # Execute a SQL Command. Returns False if Exception Occurred
-    def execute(self, sql_cmd) -> Bool:
+    def execute(self, sql_cmd) -> bool:
         try:
             conn = self.connect()
             conn.execute(sql_cmd)
@@ -26,7 +26,7 @@ class SQLHelper(object):
             return False
 
     # SQL Insertion Wrapper. Returns False if aborted insertion, True elsewise
-    def insert(self, table, rows, values, id_row, id_value) -> Bool:
+    def insert(self, table, rows, values, id_row, id_value) -> bool:
         # str_rows = str(rows)[1:-1].replace('\'','')
 
         # String-ify rows and values
