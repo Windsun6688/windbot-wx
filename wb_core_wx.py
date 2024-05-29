@@ -164,8 +164,8 @@ class Core(object):
 
     # Configure some static for Helper Handler
     def config_hdlr_static(self)-> None:
-        self.hldr.BOT_GC_INVOKER = self.BOT_GC_INVOKER
-        self.hldr.BOT_DM_INVOKER = self.BOT_DM_INVOKER
+        self.hdlr.BOT_GC_INVOKER = self.BOT_GC_INVOKER
+        self.hdlr.BOT_DM_INVOKER = self.BOT_DM_INVOKER
 
 class Handler(object):
     """Handling WebSocket Messages"""
