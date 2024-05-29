@@ -36,8 +36,8 @@ class Core(object):
     def _init_static(self) -> None:
         # Local Resource Path
         self.project_path = os.path.join(os.path.dirname(__file__))
-        self.static_path = os.path.join(project_path,'static')
-        self.wb_db_path = os.path.join(project_path,'windbotDB.db')
+        self.static_path = os.path.join(self.project_path,'static')
+        self.wb_db_path = os.path.join(self.project_path,'windbotDB.db')
 
         # Initialize Bot Config
         try:
