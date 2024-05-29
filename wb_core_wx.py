@@ -15,6 +15,7 @@ import sys
 # Third Party Imports
 import rel
 from colorama import init
+from bs4 import BeautifulSoup
 
 class Core(object):
     """Windbot Core Bridging Between Modules and wxapi Messenger"""
@@ -100,11 +101,11 @@ class Core(object):
         self.msgr.get_wxuser_list()
 
         # Update Admin List
-        for wxid in self.SUDO_LIST:
-            self.wb_db.update('Users','powerLevel',3 ,f"wxid = '{wxid}'")
+        # for wxid in self.SUDO_LIST:
+        #     self.wb_db.update('Users','powerLevel',3 ,f"wxid = '{wxid}'")
 
         start_time = time.strftime("%Y-%m-%d %X")
-        self.msgr.send_txt_msg(f"启动完成\n{start_time}", self.SUDO_LIST[0])
+        # self.msgr.send_txt_msg(f"启动完成\n{start_time}", self.SUDO_LIST[0])
 
         # ASCII Art Credit: FigLet & Me
         start_ascii_art = ("",
@@ -117,11 +118,11 @@ class Core(object):
         "#                                                     #",
         "#######################################################",
         "")
-        print(start_ascii_art)
+        print("\n".join(start_ascii_art))
 
     # On WebsocketApp Error (Unlikely)
     def on_error(self, ws, error):
-        output(f"WebSocket On_Error:{error}",'ERROR','HIGHLIGHT','RED')
+        output(f"Error: {error}",'ERROR','HIGHLIGHT','RED')
 
     # On Websocket Server Close (Very Unlikely)
     def on_close(self, ws, signal, status):
@@ -401,6 +402,7 @@ class Handler(object):
                     self.wb_db.insert('Groupchats',\
                                 ['roomid','groupname','announce','rssPush'],\
                                 [room_id, group_name, 1, 0], 'roomid', room_id)
+                    self.wb_db._gc_table_init(f"r{room_id}")
 
                 # Exists, update groupchat infomation
                 else:
@@ -414,18 +416,17 @@ class Handler(object):
                                   'wxid', item['wxid'])
 
         # Recursively start to update chatroom's members
-        self.msgr.get_chatroom_memberlist()
+        output(item['wxid'])
+        self.msgr.get_chatroom_memberlist(item['wxid'])
 
     # Handles memberlist for each Chatroom.
     def handle_memberlist(self, j) -> None:
         data = j["content"]
         for room in data:
             room_id = room["room_id"]
-            room_id_num = roomid[:-9]
+            room_num = room_id[:-9]
 
             members = room['member']
-            self.wb_db._gc_table_init(f"r{room_id_num}")
-
             for m in members:
                 self.wb_db.insert(f"r{room_num}",["wxid"],[m], "wxid", m)
                 self.wb_db.insert("Users",["wxid"],[m], "wxid", m)
@@ -451,7 +452,7 @@ class Handler(object):
         output(j)
 
 # Custom Print Wrapper
-def output(self, msg, logtype='SYSTEM', mode ='DEFAULT', background='DEFAULT'):
+def output(msg, logtype='SYSTEM', mode='DEFAULT', background='DEFAULT'):
     LogColor = {
         'SYSTEM': '034',
         'ERROR': '037',
@@ -492,6 +493,7 @@ def output(self, msg, logtype='SYSTEM', mode ='DEFAULT', background='DEFAULT'):
     if line_cnt > 10 and logtype != 'ERROR':
         msg = "\n".join(msg.split("\n")[:10])
         msg += '\n......'
+
     print(f"[{now} \033[{mode};{color}{bg}m{logtype}\033[0m] {msg}")
 
     # Write Error Logs on to Local File

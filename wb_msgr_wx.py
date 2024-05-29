@@ -22,6 +22,7 @@ class Messenger(object):
         self.USER_LIST = 5000
         self.ATTATCH_FILE = 5003
         self.CHATROOM_MEMBERLIST = 5010
+        self.CHATROOM_MEMBER_NICK = 5020
         self.DEBUG_SWITCH = 6000
         self.PERSONAL_INFO = 6500
         self.PERSONAL_DETAIL = 6550

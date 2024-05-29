@@ -27,11 +27,9 @@ class SQLHelper(object):
 
     # SQL Insertion Wrapper. Returns False if aborted insertion, True elsewise
     def insert(self, table, rows, values, id_row, id_value) -> bool:
-        # str_rows = str(rows)[1:-1].replace('\'','')
-
         # String-ify rows and values
-        str_rows = ", ".join(rows).replace('\'', '')
-        str_values = ", ".join(values)
+        str_rows = str(rows)[1:-1].replace('\'','')
+        str_values = str(values)[1:-1]
         
         # id_row Check Duplicates
         if isinstance(id_value, str):
@@ -39,6 +37,7 @@ class SQLHelper(object):
         else:
             check_dup_cmd = f"SELECT 1 FROM {table} WHERE {id_row}={id_value}"
         
+
         conn = self.connect()
         cur = self.cursor(conn)
 
@@ -50,8 +49,8 @@ class SQLHelper(object):
             return False
 
         # Insert Row
-        insert_cmd = f"INSERT INTO {table}({rows}) VALUES({values})"
-        
+        insert_cmd = f"INSERT INTO {table}({str_rows}) VALUES({str_values})"
+
         # Execute & Commit
         conn.execute(insert_cmd)
         conn.commit()
@@ -78,9 +77,9 @@ class SQLHelper(object):
     def fetch(self, table, cols = None, condition = None, cur = None) -> list:
         cols = ['*'] if cols == None else cols
 
-        str_cols = ", ".join(cols).replace('\'', '')
+        str_cols = str(cols)[1:-1].replace('\'','')
 
-        fetch_cmd = f"SELECT {cols} FROM {table}"
+        fetch_cmd = f"SELECT {str_cols} FROM {table}"
         if condition:
             fetch_cmd += f" WHERE {condition}"
 
@@ -184,7 +183,7 @@ class SQLHelper(object):
         conn = self.connect()
         init_gc_overview_cmd = f'''CREATE TABLE IF NOT EXISTS Groupchats
                 (roomid TEXT,
-                groupname TEXT
+                groupname TEXT,
                 announce BOOL NOT NULL DEFAULT 0,
                 rssPush BOOL NOT NULL DEFAULT 1);'''
         conn.execute(init_gc_overview_cmd)
@@ -197,6 +196,7 @@ class SQLHelper(object):
         init_gc_cmd = f'''CREATE TABLE IF NOT EXISTS {roomid}
                 (wxid TEXT,
                 groupUsrName TEXT);'''
+
         conn.execute(init_gc_cmd)
         conn.commit()
         conn.close()
