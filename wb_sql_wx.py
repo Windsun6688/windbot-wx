@@ -101,7 +101,7 @@ class SQLHelper(object):
         return [i for i in result]
 
     # SQL Fuzzy Match.
-    def match(self, table, cols = None, condition_col, keyword) -> List:
+    def match(self, table, condition_col, keyword, col = None) -> List:
         cols = ['*'] if cols == None else cols
 
         conn = self.connect()
