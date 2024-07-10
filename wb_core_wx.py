@@ -442,7 +442,7 @@ class Handler(object):
 
         nickname = data['nick']
         wxid = data['wxid']
-        room_id = data['roomid'].replace("@chatroom")
+        room_id = data['roomid'].replace("@chatroom", "")
 
         self.wb_db.update(f"r{room_id}", "groupUsrName", nickname,\
                     "wxid", wxid)
