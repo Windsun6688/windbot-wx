@@ -104,7 +104,7 @@ class Core(object):
 
         # Update Admin List
         for wxid in self.SUDO_LIST:
-            self.wb_db.update('Users','powerLevel',3 ,f"wxid = '{wxid}'")
+            self.wb_db.update('Users', 'powerLevel', 3, "wxid", wxid)
 
         start_time = time.strftime("%Y-%m-%d %X")
         self.msgr.send_txt_msg(f"启动完成\n{start_time}", self.SUDO_LIST[0])
@@ -259,18 +259,18 @@ class Handler(object):
         #
         # if msgJson['id2']:
         #     roomid = msgJson['id1'] #群id
-        #     senderid = msgJson['id2'] #个人id
+        #     sender_id = msgJson['id2'] #个人id
         #
         #     nickname = sql_fetch(cur,f'r{roomid[:-9]}',['groupUsrName'],\
-        #                         f"wxid = '{senderid}'")[0][0]
+        #                         f"wxid = '{sender_id}'")[0][0]
         #     roomname = sql_fetch(cur,'Groupchats',['groupname'],\
         #                          f'roomid = {roomid[:-9]}')[0][0]
         #     # Terminal Log
         #     output(f'{roomname}-{nickname}: [IMAGE]','GROUPCHAT')
         # else:
-        #     senderid = msgJson['id1'] #个人id
+        #     sender_id = msgJson['id1'] #个人id
         #     nickname = sql_fetch(cur,'Users',['realUsrName'],\
-        #                         f"wxid = '{senderid}'")[0][0]
+        #                         f"wxid = '{sender_id}'")[0][0]
         #     # Terminal Log
         #     output(f'{nickname}: [IMAGE]','DM')
 
@@ -284,27 +284,28 @@ class Handler(object):
 
         # If msg comes from a Chatroom
         if msgJson["wxid"].endswith("@chatroom"):
-            roomid = msgJson['wxid'] #群id
-            senderid = msgJson['id1'] #个人id
+            room_id = msgJson['wxid'] #群id
+            room_num = room_id.replace("@chatroom", "")
+            sender_id = msgJson['id1'] #个人id
 
-            nickname = self.wb_db.fetch(f"r{roomid[:-9]}",["groupUsrName"],\
-                                f"wxid = '{senderid}'")[0][0]
+            nickname = self.wb_db.fetch(f"r{room_num}","groupUsrName",\
+                                "wxid", sender_id)[0][0]
 
-            roomname = self.wb_db.fetch("Groupchats",["groupname"],\
-                                f"roomid = {roomid[:-9]}")[0][0]
+            roomname = self.wb_db.fetch("Groupchats","groupname",\
+                                "room_id", f"r{room_num}")[0][0]
 
             # Handle User Calls
             message = msgJson["content"].replace('\u2005','')
 
             if message.startswith(self.BOT_GC_INVOKER):
-                usr_call = message[8:]
+                usr_call = message.replace(self.BOT_GC_INVOKER, "", 1)
                 output(f"{roomname}-{nickname}: {usr_call}", "CALL", "HIGHLIGHT")
-                self.handle_recv_call(usr_call, senderid, roomid)
+                self.handle_recv_call(usr_call, sender_id, room_id)
                 return
 
             # Log Normal Messages
             if isCite == False:
-                output(f'{roomname}-{nickname}: {message}','GROUPCHAT')
+                output(f'{room_num}-{nickname}: {message}','GROUPCHAT')
             else:
                 # little patch that makes no sense at all
                 # WX Why you do this to me!!!!! *Dies*
@@ -318,20 +319,18 @@ class Handler(object):
                     'GROUPCHAT')
         # If msg comes from DM 
         else:
-            roomid = None
-            senderid = msgJson['wxid'] #个人id
-            destination = senderid
+            sender_id = msgJson['wxid'] #个人id
 
             nickname = self.wb_db.fetch("Users",["realUsrName"],\
-                                f"wxid = '{senderid}'")[0][0]
+                                f"wxid = '{sender_id}'")[0][0]
 
             # Handle User Calls
             message = msgJson['content'].replace('\u2005','')
             if message.startswith(self.BOT_DM_INVOKER):
-                usr_call = message[2:]
+                usr_call = message.replace(self.BOT_DM_INVOKER, "", 1)
 
                 output(f"{nickname}: {usr_call}", "CALL", "HIGHLIGHT")
-                self.handle_recv_call(usr_call, senderid, senderid) 
+                self.handle_recv_call(usr_call, sender_id, sender_id) 
                 return
 
             # Terminal Log Normal Messages
@@ -392,18 +391,16 @@ class Handler(object):
     #################### USER DB RELATED FUNCTIONS BELOW #################### 
     # Handles the bot account's contact list.
     def handle_wxuser_list(self, j) -> None:
-        i = 0
-        for item in j["content"]:
-            i += 1
+        for (i,item) in enumerate(j["content"]):
             output(f"[{i}] {item['wxid']} {item['name']}")
 
             # If item is Chatroom
             if item["wxid"].endswith("@chatroom"):
-                room_id = item["wxid"][:-9]
+                room_id = item["wxid"].replace("@chatroom", "")
                 group_name = item["name"]
 
                 # Check if Chatroom existed in record
-                res = self.wb_db.fetch('Groupchats',['*'],f"roomid = '{room_id}'")
+                res = self.wb_db.fetch("Groupchats", "*", "roomid", room_id)
 
                 # Does not exist, insert groupchat info into record
                 if len(res) == 0:
@@ -415,7 +412,7 @@ class Handler(object):
                 # Exists, update groupchat infomation
                 else:
                     self.wb_db.update('Groupchats','groupname', group_name,\
-                                      f"roomid = '{room_id}'")
+                                      "roomid", room_id)
 
             # If item is single user
             else:
@@ -424,21 +421,20 @@ class Handler(object):
                                   'wxid', item['wxid'])
 
         # Recursively start to update chatroom's members
-        output(item['wxid'])
+        # output(item['wxid'])
         self.msgr.get_chatroom_memberlist(item['wxid'])
 
     # Handles memberlist for each Chatroom.
     def handle_memberlist(self, j) -> None:
         data = j["content"]
         for room in data:
-            room_id = room["room_id"]
-            room_num = room_id[:-9]
+            room_id = room["room_id"].replace("@chatroom", "")
 
             members = room['member']
             for m in members:
-                self.wb_db.insert(f"r{room_num}",["wxid"],[m], "wxid", m)
-                self.wb_db.insert("Users",["wxid"],[m], "wxid", m)
-                self.msgr.get_chat_nick_p(m,room_num)
+                self.wb_db.insert(f"r{room_id}", ["wxid"], [m], "wxid", m)
+                self.wb_db.insert("Users",["wxid"], [m], "wxid", m)
+                self.msgr.get_chat_nick_p(m, room_id)
 
     # Handles a single User's nickname in a Chatroom.
     def handle_chat_nick(self, j) -> None:
@@ -446,10 +442,10 @@ class Handler(object):
 
         nickname = data['nick']
         wxid = data['wxid']
-        roomid = data['roomid']
+        room_id = data['roomid'].replace("@chatroom")
 
-        self.wb_db.update(f'r{roomid[:-9]}','groupUsrName',nickname,\
-                    f"wxid = '{wxid}'")
+        self.wb_db.update(f"r{room_id}", "groupUsrName", nickname,\
+                    "wxid", wxid)
 
     # Handles a single User's details. @TODO
     def handle_personal_detail(self, j) -> None:

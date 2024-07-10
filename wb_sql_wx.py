@@ -33,7 +33,7 @@ class SQLHelper(object):
         cur = self.cursor(conn)
 
         # Check Duplicate by id_row & id_value 
-        cur.execute(f"SELECT 1 FROM {table} WHERE ? = ?", (id_row, id_value))
+        cur.execute(f"SELECT 1 FROM {table} WHERE {id_row} = ?", [id_value])
         result = cur.fetchone()
 
         # Duplicate. Abort the insertion
