@@ -1,7 +1,7 @@
 # WindBot SQL Helper Functions
 # May 2024
 
-# Third Party Imports
+# Standard Lib Imports
 import sqlite3
 
 class SQLHelper(object):
@@ -20,6 +20,7 @@ class SQLHelper(object):
         try:
             conn = self.connect()
             conn.execute(sql_cmd)
+            conn.commit()
             conn.close()
             return True
         except Exception as e:
@@ -27,21 +28,12 @@ class SQLHelper(object):
 
     # SQL Insertion Wrapper. Returns False if aborted insertion, True elsewise
     def insert(self, table, rows, values, id_row, id_value) -> bool:
-        # String-ify rows and values
-        str_rows = str(rows)[1:-1].replace('\'','')
-        str_values = str(values)[1:-1]
-        
-        # id_row Check Duplicates
-        if isinstance(id_value, str):
-            check_dup_cmd = f"SELECT 1 FROM {table} WHERE {id_row}='{id_value}'"
-        else:
-            check_dup_cmd = f"SELECT 1 FROM {table} WHERE {id_row}={id_value}"
-        
-
+        # Connect to DB
         conn = self.connect()
         cur = self.cursor(conn)
 
-        cur.execute(check_dup_cmd)
+        # Check Duplicate by id_row & id_value 
+        cur.execute(f"SELECT 1 FROM {table} WHERE ? = ?", (id_row, id_value))
         result = cur.fetchone()
 
         # Duplicate. Abort the insertion
@@ -49,57 +41,51 @@ class SQLHelper(object):
             return False
 
         # Insert Row
-        insert_cmd = f"INSERT INTO {table}({str_rows}) VALUES({str_values})"
+        rows_str = ", ".join(rows)
+        placehldr = ", ".join(["?"] * len(values))
+        insert_cmd = f"INSERT INTO {table} ({rows_str}) VALUES ({placehldr})"
+        conn.executemany(insert_cmd, [values])
 
-        # Execute & Commit
-        conn.execute(insert_cmd)
+        # Commit & Close
         conn.commit()
         cur.close()
         conn.close()
         return True
     
     # SQL Update Wrapper. 
-    def update(self, table, col, value, condition = None) -> None:
-        if isinstance(value,str):
-            update_cmd = f"UPDATE {table} SET {col} = '{value}'"
-        else:
-            update_cmd = f"UPDATE {table} SET {col} = {value}"
-
-        if condition:
-            update_cmd += f" WHERE {condition}"
-
+    def update(self, table, col, val, condi_row, condi_val) -> None:
+        # Connect to DB
         conn = self.connect()
-        conn.execute(update_cmd)
+        cur = self.cursor(conn)
+
+        # Update Row 
+        update_cmd = f"UPDATE {table} SET {col} = ? WHERE {condi_row} = ?"
+        conn.execute(update_cmd, [val, condi_val])
+
+        # Commit & Close
         conn.commit()
         conn.close()
 
     # SQL Select Wrapper.
-    def fetch(self, table, cols = None, condition = None, cur = None) -> list:
-        cols = ['*'] if cols == None else cols
+    def fetch(self, table, cols, condi_row, condi_val) -> list:
+        # Connect to DB
+        conn = self.connect()
+        cur = self.cursor(conn)
 
-        str_cols = str(cols)[1:-1].replace('\'','')
+        # Fetch Rows
+        cols_str = ", ".join(cols)
+        fetch_cmd = f"SELECT {cols_str} FROM {table} WHERE {condi_row} = ?"
 
-        fetch_cmd = f"SELECT {str_cols} FROM {table}"
-        if condition:
-            fetch_cmd += f" WHERE {condition}"
+        cur.execute(fetch_cmd, [condi_val])
+        result = cur.fetchall()
 
-        if cur == None:
-            conn = self.connect()
-            cur = self.cursor(conn)
-
-            cur.execute(fetch_cmd)
-            result = cur.fetchall()
-
-            cur.close()
-            conn.close()
-        # Given a Cursor
-        else:
-            cur.execute(fetch_cmd)
-            result = cur.fetchall()
+        # Close
+        cur.close()
+        conn.close()
 
         return [i for i in result]
 
-    # SQL Fuzzy Match.
+    # SQL Fuzzy Match. *DEPRECIATED*
     def match(self, table, condition_col, keyword, col = None) -> list:
         cols = ['*'] if cols == None else cols
 
@@ -141,27 +127,40 @@ class SQLHelper(object):
 
     # SQL Destroy Wrapper.
     def destroy(self, table) -> None:
+        # Connect to DB
         conn = self.connect()
+        cur = self.cursor(conn)
 
+        # ━━━━[]
+        #     / \＞
+        #     ＜ ＼
         destroy_cmd = f"DROP TABLE {table}"
+        cur.execute(destroy_cmd)
 
-        conn.execute(destroy_cmd)
+        # Commit & Close
         conn.commit()
+        cur.close()
         conn.close()
 
     # SQL Delete Wrapper.
-    def delete(self, table, condition) -> None:
+    def delete(self, table, condi_row, condi_val) -> None:
+        # Connect to DB
         conn = self.connect()
+        cur = self.cursor(conn)
 
-        delete_cmd = f"DELETE FROM {table} WHERE {condition}"
+        # Delete Records
+        delete_cmd = f"DELETE FROM {table} WHERE {condi_row} = ?"
+        cur.execute(delete_cmd, [condi_val])
 
-        conn.execute(delete_cmd)
+        # Commit & Close
         conn.commit()
+        cur.close()
         conn.close()
 
     # WB DB Structure: Initialize the User Table.
     def _usr_table_init(self) -> None:
         conn = self.connect()
+
         init_usr_cmd = f'''CREATE TABLE IF NOT EXISTS Users
                 (wxid TEXT,
                 wxcode TEXT,
@@ -181,6 +180,7 @@ class SQLHelper(object):
     # WB DB Structure: Initialize the Groupchats (Group Overview) Table.
     def _group_overview_table_init(self) -> None:
         conn = self.connect()
+
         init_gc_overview_cmd = f'''CREATE TABLE IF NOT EXISTS Groupchats
                 (roomid TEXT,
                 groupname TEXT,
@@ -193,6 +193,7 @@ class SQLHelper(object):
     # WB DB Structure: Initialize a Groupchat Data Table.
     def _gc_table_init(self, roomid) -> None:
         conn = self.connect()
+
         init_gc_cmd = f'''CREATE TABLE IF NOT EXISTS {roomid}
                 (wxid TEXT,
                 groupUsrName TEXT);'''
@@ -200,4 +201,5 @@ class SQLHelper(object):
         conn.execute(init_gc_cmd)
         conn.commit()
         conn.close()
+
 

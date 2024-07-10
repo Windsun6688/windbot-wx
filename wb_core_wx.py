@@ -103,11 +103,11 @@ class Core(object):
         self.msgr.get_wxuser_list()
 
         # Update Admin List
-        # for wxid in self.SUDO_LIST:
-        #     self.wb_db.update('Users','powerLevel',3 ,f"wxid = '{wxid}'")
+        for wxid in self.SUDO_LIST:
+            self.wb_db.update('Users','powerLevel',3 ,f"wxid = '{wxid}'")
 
         start_time = time.strftime("%Y-%m-%d %X")
-        # self.msgr.send_txt_msg(f"启动完成\n{start_time}", self.SUDO_LIST[0])
+        self.msgr.send_txt_msg(f"启动完成\n{start_time}", self.SUDO_LIST[0])
 
         # ASCII Art Credit: FigLet & Me
         start_ascii_art = ("",
@@ -364,6 +364,7 @@ class Handler(object):
             resp_list = ["您好!","我可以帮到您些什么?"]
             self.msgr.send_txt_msg(random.choice(resp_list), wxid = destination)
 
+    # Helper of handle_recv_msg, Handles function call processes1.
     def handle_recv_call(self, usr_call, usr_id, destination) -> None: #@TODO
         output("CALLED")
 
@@ -386,7 +387,7 @@ class Handler(object):
     
     # Handles the WebSocket Server Post Check.
     def handle_ws_postcheck(self, j) -> None:
-        output("WebSocket Server CHECKED")
+        output("WebSocket Server CHECKED", background = "WHITE")
 
     #################### USER DB RELATED FUNCTIONS BELOW #################### 
     # Handles the bot account's contact list.
