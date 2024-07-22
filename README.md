@@ -4,11 +4,15 @@
 
 ```
 #######################################################
+#                                                     #
 # ___       ______       ________________      _____  #
 # __ |     / /__(_)____________  /__  __ )_______  /_ #
 # __ | /| / /__  /__  __ \  __  /__  __  |  __ \  __/ #
 # __ |/ |/ / _  / _  / / / /_/ / _  /_/ // /_/ / /_   #
 # ____/|__/  /_/  /_/ /_/\__,_/  /_____/ \____/\__/   #
+#                                                     #
+#    ____ ____ ____ ____ ____ ___ ____ ____ ____ ___  #
+#    |--< |=== |--- |--| |___  |  [__] |--< |=== |__> #
 #                                                     #
 #######################################################
 
@@ -63,6 +67,10 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 
 <details>
   <summary>点我展开 Click To Expand</summary>
+
+- 2024.7.23
+
+  - 模块化重构
 
 - 2024.2.28
 
@@ -169,7 +177,7 @@ WindBot主要提供 [Arcaea](https://arcaea.lowiro.com/) / [maimaiDX](https://ma
 
 ## :gift_heart: 特别感谢 Thanks
 
-本机器人以这个库为基础开发 This chatbot is developed based on [cixingguangming55555's Wechat API](https://github.com/cixingguangming55555/wechat-bot).
+本机器人以这个库为基础开发 This chatbot is developed based on [cixingguangming55555's API](https://github.com/cixingguangming55555/wechat-bot).
 
 使用来自这里的歌曲数据库 Using song database from [ArcaeaSongDataBase](https://github.com/Arcaea-Infinity/ArcaeaSongDatabase)
 

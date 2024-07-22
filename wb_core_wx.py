@@ -4,13 +4,16 @@
 # Local Imports
 from wb_msgr_wx import Messenger
 from wb_sql_wx import SQLHelper
-from modules.core.main import CoreFunctions
 
 # Standard Lib Imports
 import os
 import json
 import time
 import sys
+import random
+import importlib
+from threading import Thread
+import traceback
 
 # Third Party Imports
 import rel
@@ -22,6 +25,23 @@ class Core(object):
     def __init__(self, MSGR):
         self._init_static()
 
+        # ASCII Art Credit: FigLet & Me
+        start_ascii_art = ("",
+        "#######################################################",
+        "#                                                     #",
+        "# ___       ______       ________________      _____  #",
+        "# __ |     / /__(_)____________  /__  __ )_______  /_ #",
+        "# __ | /| / /__  /__  __ \  __  /__  __  |  __ \  __/ #",
+        "# __ |/ |/ / _  / _  / / / /_/ / _  /_/ // /_/ / /_   #",
+        "# ____/|__/  /_/  /_/ /_/\__,_/  /_____/ \____/\__/   #",
+        "#                                                     #",
+        "#    ____ ____ ____ ____ ____ ___ ____ ____ ____ ___  #",
+        "#    |--< |=== |--- |--| |___  |  [__] |--< |=== |__> #",
+        "#                                                     #",
+        "#######################################################",
+        "")
+        print("\n".join(start_ascii_art))
+
         # Initialize WB DB SQLHelper
         self.wb_db = SQLHelper(self.wb_db_path)
 
@@ -29,8 +49,12 @@ class Core(object):
         self.msgr = MSGR
         self.launch_msgr_ws()
 
+        # Initialize ModuleLoader
+        self.mdldr = ModuleLoader(self.BOT_MODULES, self.modules_path,\
+                                  self.LOADED_MODULES)
+
         # Initialize Handler
-        self.hdlr = Handler(self.msgr, self.wb_db)
+        self.hdlr = Handler(self.msgr, self.wb_db, self.LOADED_MODULES)
         self.config_hdlr_static()
 
     # Initialize static values for Core
@@ -38,6 +62,7 @@ class Core(object):
         # Local Resource Path
         self.project_path = os.path.join(os.path.dirname(__file__))
         self.static_path = os.path.join(self.project_path,'static')
+        self.modules_path = os.path.join(self.project_path,'modules')
         self.wb_db_path = os.path.join(self.project_path,'windbotDB.db')
 
         # Initialize Bot Config
@@ -50,6 +75,7 @@ class Core(object):
                 init_config = { "botName": "YOUR TRIGGER FOR GROUPCHAT",
                                 "botDMInvoker": "YOUR TRIGGER FOR DM",
                                 "Sudoers": ["YOUR WXID"],
+                                "Modules": ["core"],
                                 "wxIP": "127.0.0.1",
                                 "wxPort": "5555"}
                 f.write(json.dumps(init_config, ensure_ascii = False, indent = 4))
@@ -61,6 +87,7 @@ class Core(object):
         self.BOT_NAME = wb_config["botName"]
         self.BOT_GC_INVOKER = f"@{self.BOT_NAME}"
         self.BOT_DM_INVOKER = wb_config["botDMInvoker"]
+        self.BOT_MODULES = wb_config["Modules"]
         self.SUDO_LIST = wb_config["Sudoers"]
         self.FUNTOOL_IP = wb_config["wxIP"]
         self.FUNTOOL_PORT = wb_config["wxPort"]
@@ -80,7 +107,7 @@ class Core(object):
         self.GET_USER_LIST_SUCCSESS = 5001
         self.GET_USER_LIST_FAIL = 5002
 
-        self.ATTATCH_FILE = 5003
+        self.ATTACH_FILE = 5003
 
         self.HEART_BEAT = 5005
 
@@ -92,6 +119,9 @@ class Core(object):
         self.PERSONAL_DETAIL = 6550
         self.DESTROY_ALL = 9999
         self.STATUS_MSG = 10000
+
+        # Loaded Modules 
+        self.LOADED_MODULES = dict()
 
     # On WebsocketApp Open
     def on_open(self, ws):
@@ -108,19 +138,6 @@ class Core(object):
 
         start_time = time.strftime("%Y-%m-%d %X")
         self.msgr.send_txt_msg(f"启动完成\n{start_time}", self.SUDO_LIST[0])
-
-        # ASCII Art Credit: FigLet & Me
-        start_ascii_art = ("",
-        "#######################################################",
-        "# ___       ______       ________________      _____  #",
-        "# __ |     / /__(_)____________  /__  __ )_______  /_ #",
-        "# __ | /| / /__  /__  __ \  __  /__  __  |  __ \  __/ #",
-        "# __ |/ |/ / _  / _  / / / /_/ / _  /_/ // /_/ / /_   #",
-        "# ____/|__/  /_/  /_/ /_/\__,_/  /_____/ \____/\__/   #",
-        "#                                                     #",
-        "#######################################################",
-        "")
-        print("\n".join(start_ascii_art))
 
     # On WebsocketApp Error (Unlikely)
     def on_error(self, ws, error):
@@ -145,12 +162,12 @@ class Core(object):
             self.PERSONAL_DETAIL: self.hdlr.handle_personal_detail,
             self.TXT_MSG: self.hdlr.handle_sent_msg,
             self.PIC_MSG: self.hdlr.handle_sent_msg,
-            self.ATTATCH_FILE: self.hdlr.handle_sent_msg,
+            self.ATTACH_FILE: self.hdlr.handle_sent_msg,
             self.CHATROOM_MEMBER: self.hdlr.handle_memberlist,
             self.RECV_PIC_MSG: self.hdlr.handle_recv_pic,
             self.RECV_TXT_MSG: self.hdlr.handle_recv_msg,
             self.RECV_TXT_CITE_MSG: self.hdlr.handle_xml_msg,
-            self.HEART_BEAT: print,
+            self.HEART_BEAT: self.hdlr.handle_hb,
             self.USER_LIST: self.hdlr.handle_wxuser_list,
             self.GET_USER_LIST_SUCCSESS: print,
             self.GET_USER_LIST_FAIL: print,
@@ -173,17 +190,57 @@ class Core(object):
 
 class Handler(object):
     """Handling WebSocket Messages"""
-    def __init__(self, MSGR, WBDB):
+    def __init__(self, MSGR, WBDB, LDMD):
         self._init_static()
         self.msgr = MSGR
         self.wb_db = WBDB
+        self.loaded_modules = LDMD
+        self._init_func_collection()
 
+    # Initialize static variables
     def _init_static(self) -> None:
         self.pat_invoker = "拍了拍我"
         self.wb_invite_invokers = ("邀请你","加入群聊")
         self.invite_invokers = ("邀请", "加入群聊")
         self.wb_invite_msg = "感谢您选择WindBot！"
         self.wb_greeting_msg = "欢迎进群"
+        self.wb_summon_msg = ("您好!","我可以帮到您些什么?")
+        self.wb_empty_call_msg = "请指明需要使用的功能。"
+        self.power_weak_msg = "您的权限不足。"
+        self.func_disabled_msg = "该功能暂时关闭。"
+        self.depreciated_func_msg = {
+            "b30": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
+            "arcrecent": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
+            "mb40": "请移步maimai b50。\n指令: mb50"
+        }
+        self.undisturbed_hb = 0
+        self.uptime_hb_cnt = 0
+
+    # Initialize the function collection
+    def _init_func_collection(self) -> None:
+        self.all_func = dict()
+        self.avail_usr_func = dict()
+        self.avail_mngng_func = dict()
+
+        for m in self.loaded_modules:
+            module_instance = self.loaded_modules[m]
+            user_func = module_instance.USER_FUNCTIONS
+            mngng_func = module_instance.MNGNG_FUNCTIONS
+
+            module_name = module_instance.META.get_name()
+
+            usr_func_avail = dict()
+            mngng_func_avail = dict()
+            for keyword in user_func:
+                usr_func_avail[keyword] = True
+                self.all_func[keyword] = user_func[keyword]
+
+            for keyword in mngng_func:
+                mngng_func_avail[keyword] = True
+                self.all_func[keyword] = mngng_func[keyword]
+
+            self.avail_usr_func[module_name] = usr_func_avail
+            self.avail_mngng_func[module_name] = mngng_func_avail
 
     # wxapi: handle status message
     def handle_status_msg(self, msgJson) -> None:
@@ -274,8 +331,10 @@ class Handler(object):
         #     # Terminal Log
         #     output(f'{nickname}: [IMAGE]','DM')
 
+    #################### USER CALL RELATED FUNCTIONS BELOW ################## 
     # wxapi: handle text message
     def handle_recv_msg(self, msgJson) -> None:
+        self.undisturbed_hb = 0
         isCite = False
         # If msg is a cite message
         if msgJson.get("refnick", -1) != -1 and \
@@ -284,15 +343,17 @@ class Handler(object):
 
         # If msg comes from a Chatroom
         if msgJson["wxid"].endswith("@chatroom"):
+            isRoom = True
+
             room_id = msgJson['wxid'] #群id
             room_num = room_id.replace("@chatroom", "")
             sender_id = msgJson['id1'] #个人id
 
-            nickname = self.wb_db.fetch(f"r{room_num}","groupUsrName",\
+            nickname = self.wb_db.fetch(f"r{room_num}",["groupUsrName"],\
                                 "wxid", sender_id)[0][0]
 
-            roomname = self.wb_db.fetch("Groupchats","groupname",\
-                                "room_id", f"r{room_num}")[0][0]
+            roomname = self.wb_db.fetch("Groupchats",["groupname"],\
+                                "roomid", room_num)[0][0]
 
             # Handle User Calls
             message = msgJson["content"].replace('\u2005','')
@@ -305,7 +366,7 @@ class Handler(object):
 
             # Log Normal Messages
             if isCite == False:
-                output(f'{room_num}-{nickname}: {message}','GROUPCHAT')
+                output(f'{roomname}-{nickname}: {message}','GROUPCHAT')
             else:
                 # little patch that makes no sense at all
                 # WX Why you do this to me!!!!! *Dies*
@@ -319,10 +380,11 @@ class Handler(object):
                     'GROUPCHAT')
         # If msg comes from DM 
         else:
+            isRoom = False
             sender_id = msgJson['wxid'] #个人id
 
             nickname = self.wb_db.fetch("Users",["realUsrName"],\
-                                f"wxid = '{sender_id}'")[0][0]
+                                "wxid", sender_id)[0][0]
 
             # Handle User Calls
             message = msgJson['content'].replace('\u2005','')
@@ -341,7 +403,6 @@ class Handler(object):
                     「-> {msgJson['refnick']} : {msgJson['refcontent']}",'DM')
 
         # Normal Messages go through a keyword trigger
-        isRoom = bool(roomid)
         self.handle_recv_keyword(message, msgJson["wxid"], isRoom)
 
     # Helper of handle_recv_msg. Checks Keyword Triggers.
@@ -360,12 +421,132 @@ class Handler(object):
         elif keyword == "pong":
             self.msgr.send_txt_msg("ping", wxid = destination)
         elif keyword.lower() == "wb":
-            resp_list = ["您好!","我可以帮到您些什么?"]
-            self.msgr.send_txt_msg(random.choice(resp_list), wxid = destination)
+            self.msgr.send_txt_msg(random.choice(self.wb_summon_msg),\
+                                   wxid = destination)
 
-    # Helper of handle_recv_msg, Handles function call processes1.
-    def handle_recv_call(self, usr_call, usr_id, destination) -> None: #@TODO
-        output("CALLED")
+    # Helper of handle_recv_msg. Handles function call processes.
+    def handle_recv_call(self, usr_call, usr_id, destination) -> None:
+        # Handles Q2B, Parsing User Call Data
+        call_data = self.stringQ2B(usr_call.strip()).split(" ")
+        ## Handle Empty Call
+        if len(call_data) == 1 and call_data[0] == '':
+            output("Did not specify function","WARNING",background = "WHITE")
+            self.msgr.send_txt_msg(self.wb_empty_call_msg, destination)
+            return
+        ## Handle Mobile @
+        if len(call_data) > 1 and call_data[0] == '':
+            call_data = call_data[1:]
+
+        # Retrieving User Call Data
+        func_keyword = call_data[0].lower()
+        func_data = call_data[1:]
+
+        # Calling Function Execution Helper
+        self.pre_call(func_keyword, func_data, usr_id, destination)
+
+    # Helper of handle_recv_call. Handles function call classifying.
+    def pre_call(self, func_keyword, func_data, usr_id, destination) -> None:
+        # Ban Check
+        if self.banned_check(usr_id) == False:
+            return
+
+        # Depreciated Functions
+        if func_keyword in self.depreciated_func_msg:
+            self.msgr.send_txt_msg(self.depreciated_func_msg[func_keyword],\
+                                 destination)
+            return
+
+        # Non-Existent Functions
+        if func_keyword not in self.all_func:
+            output("Called non-existent function","WARNING",\
+                   background = 'WHITE')
+            func_non_existent_msg = \
+                    f"没有该指令： {func_keyword}\n请使用listfunc查找您需要的指令。"
+
+            self.msgr.send_txt_msg(func_non_existent_msg,\
+                                 destination)
+            return
+
+        # User Functions
+        for module in self.avail_usr_func:
+            if func_keyword in self.avail_usr_func[module]:
+                # Check if functions is disabled
+                func_status = self.avail_usr_func[module][func_keyword]
+                if func_status == False:
+                    self.msgr.send_txt_msg(self.func_disabled_msg,\
+                                           destination)
+                    return
+                # User Functions will be executed in threads
+                tFunc = Thread(target = self.execute_call,\
+                                args = (func_keyword,\
+                                        [func_data, usr_id, destination]))
+                tFunc.start()
+                return
+
+        # Managing Functions
+        for module in self.avail_mngng_func:
+            if func_keyword in self.avail_mngng_func[module]:
+                # Power Check for Managing Functions
+                if self.power_check(usr_id, 3) == False:
+                    self.msgr.send_txt_msg(self.power_weak_msg,\
+                                           destination)
+                    return
+
+                # Managing Functions will be blocking
+                self.execute_call(func_keyword,\
+                                    [func_data, usr_id, destination])
+                return
+
+    # Helper of pre_call. Do actual function calling.
+    def execute_call(self, req_func_keyword, func_args) -> None:
+        req_func = self.all_func[req_func_keyword]
+        destination = func_args[2]
+        try:
+            reply_package = req_func(func_args)
+
+        # Error Happened. Push Error Msg to destination
+        except Exception as e:
+            output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
+            output(traceback.format_exc(),'ERROR','HIGHLIGHT','RED')
+            ## Compose the Error Message.
+            err_msg = f"WB遇到了一些意料外的问题。\n指令： {req_func_keyword}"
+            err_msg += f"\n错误细节： {e}"
+            err_msg += "\n请检查指令参数。"
+            err_msg += "您也可以使用reperr和fdbk指令向WDS反馈这个问题。"
+            err_msg += f"\n反馈指令：{self.BOT_GC_INVOKER} reperr {req_func_keyword}"
+            self.msgr.send_txt_msg(err_msg, destination)
+            return
+
+        # No Error Happened. Move on to reply 
+        content = reply_package["content"]
+        if reply_package["type"] == "TEXT":
+            self.msgr.send_txt_msg(content, destination)
+        elif reply_package["type"] == "ATTACH":
+            self.msgr.send_attach(content, destination)
+        elif reply_package["type"] == "PIC":
+            self.msgr.send_pic(content, destination)
+        return
+
+    # Helper to map call keyword to linked function.
+    def call_2_func(self, keyword):
+        func = self.all_func.get(keyword, None)
+        return func
+
+    # Helper to retrieve the powerlevel of calling user.
+    def power_check(self, wxid, req_power) -> bool:
+        caller_lvl = self.wb_db.fetch("Users",["powerLevel"],\
+                                      "wxid", wxid)[0][0]
+        if caller_lvl < req_power:
+            return False
+        return True
+
+    # Helper to retrieve the banned status of calling user.
+    def banned_check(self, wxid) -> bool:
+        caller_ban_status = self.wb_db.fetch("Users",["banned"],\
+                                      "wxid", wxid)[0][0]
+        if bool(caller_ban_status) == True:
+            return False
+        return True
 
     # Character Q2B
     def Q2B(self, uchar) -> str:
@@ -382,17 +563,30 @@ class Handler(object):
     # String Q2B
     def stringQ2B(self, ustring) -> str:
         """把字符串全角转半角"""
-        return "".join([Q2B(uchar) for uchar in ustring])
+        return "".join([self.Q2B(uchar) for uchar in ustring])
     
+    #################### WB & MISC RELATED FUNCTIONS BELOW ################## 
     # Handles the WebSocket Server Post Check.
     def handle_ws_postcheck(self, j) -> None:
         output("WebSocket Server CHECKED", background = "WHITE")
+
+    # Handles Hearbeat Messages.
+    def handle_hb(self, j) -> None:
+        self.undisturbed_hb += 1
+        self.uptime_hb_cnt += 1
+
+        # Local Heartbeat Log
+        if self.undisturbed_hb < 5:
+            output("Success","HEART_BEAT","HIGHLIGHT")
+        elif self.undisturbed_hb == 5:
+            output("Undisturbed in 5 min. Hiding heartbeat logs. zZZ",\
+                   logtype = "HEART_BEAT",mode = "HIGHLIGHT")
 
     #################### USER DB RELATED FUNCTIONS BELOW #################### 
     # Handles the bot account's contact list.
     def handle_wxuser_list(self, j) -> None:
         for (i,item) in enumerate(j["content"]):
-            output(f"[{i}] {item['wxid']} {item['name']}")
+            output(f"[{i+1}] {item['wxid']} {item['name']}")
 
             # If item is Chatroom
             if item["wxid"].endswith("@chatroom"):
@@ -454,6 +648,85 @@ class Handler(object):
     # Handles a single User's info. @TODO
     def handle_personal_info(self, j) -> None:
         output(j)
+
+class ModuleLoader(object):
+    """Dynamically Loads and Initializes Modules"""
+    def __init__(self, include_modules, modules_path, instances_dict):
+        self.include_modules = include_modules
+        self.modules_path = modules_path
+        self.found_modules = dict()
+        self.module_instances = instances_dict
+        self.std_filename = "main"
+        self.scan_module()
+        self.aggregate_load()
+
+    def scan_module(self) -> None:
+        output("Scanning Modules", background = "WHITE")
+        for item in os.scandir(self.modules_path):
+            if item.is_dir():
+                # Skip __pycache__
+                if item.name == "__pycache__":
+                    continue
+
+                # Check if main.py is present
+                main_found = False
+                for sub_item in os.scandir(item.path):
+                    if sub_item.is_file():
+                        if sub_item.name == f"{self.std_filename}.py":
+                            output(f"Found Module [{item.name}]",\
+                                   background = "WHITE")
+                            main_found = True
+                            import_path = f"modules.{item.name}.{self.std_filename}"
+                            self.found_modules[item.name] = import_path
+                            break
+
+                # Warn the user if no main.py present
+                if not main_found:
+                    output(f"No main.py found in module folder '{item.name}'",\
+                           "WARNING", background = "WHITE")
+
+        output(f"Found {len(self.found_modules)} Modules", background = "WHITE")
+
+    def aggregate_load(self) -> None:
+        output(f"Loading Modules {str(self.include_modules)}",\
+               background = "WHITE")
+        for module_name in self.include_modules:
+            # Check if Designated Module is found
+            if module_name not in self.found_modules.keys():
+                output(f"User designated Module [{module_name}] not found",\
+                       "WARNING", background = "WHITE")
+                continue
+
+            # Import the module
+            path = self.found_modules[module_name]
+            loaded_module = self.load_module(module_name, path)
+            self.module_instances[module_name] = loaded_module
+
+    def load_module(self, module_name, file_path) -> list:
+        # Importing the Source File
+
+        ## Example from the importlib Documentation
+        ## Well that didnt work
+        # spec = importlib.util.spec_from_file_location(module_name, file_path)
+        # module = importlib.util.module_from_spec(spec)
+        # sys.modules[module_name] = module
+        # spec.loader.exec_module(module)
+
+        module = importlib.import_module(file_path)
+
+        # Module info with __module_meta__
+        module_meta = getattr(module, "__module_meta__")
+        name = module_meta.get_name()
+        ver = module_meta.get_version()
+        author = module_meta.get_author()
+        author_str = ", ".join(author)
+
+        # Load the Module Function Class
+        module_instance = getattr(module, name)()
+
+        output(f"Loaded Module {name} [Ver {ver}] by {author_str}",\
+               background = "WHITE")
+        return module_instance
 
 # Custom Print Wrapper
 def output(msg, logtype='SYSTEM', mode='DEFAULT', background='DEFAULT'):
@@ -528,4 +801,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-        

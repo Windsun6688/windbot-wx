@@ -75,7 +75,7 @@ class Messenger(object):
         output(f'{msg} -> {wxid}','SEND')
 
     # Tells websocket wxapi to send an attachment.
-    def send_attatch(self, filepath:str, wxid:str = 'null') -> None:
+    def send_attach(self, filepath:str, wxid:str = 'null') -> None:
         ws_data = {
             'id': self.getid(),
             'type': self.ATTATCH_FILE,
