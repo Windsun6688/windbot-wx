@@ -12,6 +12,7 @@ import time
 import sys
 import random
 import importlib
+import re
 from threading import Thread
 import traceback
 
@@ -187,6 +188,7 @@ class Core(object):
     def config_hdlr_static(self)-> None:
         self.hdlr.BOT_GC_INVOKER = self.BOT_GC_INVOKER
         self.hdlr.BOT_DM_INVOKER = self.BOT_DM_INVOKER
+        self.hdlr.SUDO_LIST = self.SUDO_LIST
 
 class Handler(object):
     """Handling WebSocket Messages"""
@@ -208,6 +210,7 @@ class Handler(object):
         self.wb_empty_call_msg = "请指明需要使用的功能。"
         self.power_weak_msg = "您的权限不足。"
         self.func_disabled_msg = "该功能暂时关闭。"
+        self.unlogged_nickname_msg = "您可能更新了昵称，但是未被WB记录。请稍后再试。"
         self.depreciated_func_msg = {
             "b30": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
             "arcrecent": "Arcaea分数相关功能因Estertion查分器下线原因暂停使用。",
@@ -220,6 +223,7 @@ class Handler(object):
     def _init_func_collection(self) -> None:
         self.all_func = dict()
         self.avail_usr_func = dict()
+        self.marked_usr_func = dict()
         self.avail_mngng_func = dict()
 
         for m in self.loaded_modules:
@@ -230,9 +234,11 @@ class Handler(object):
             module_name = module_instance.META.get_name()
 
             usr_func_avail = dict()
+            usr_func_mark = dict()
             mngng_func_avail = dict()
             for keyword in user_func:
                 usr_func_avail[keyword] = True
+                usr_func_mark[keyword] = False
                 self.all_func[keyword] = user_func[keyword]
 
             for keyword in mngng_func:
@@ -240,6 +246,7 @@ class Handler(object):
                 self.all_func[keyword] = mngng_func[keyword]
 
             self.avail_usr_func[module_name] = usr_func_avail
+            self.marked_usr_func[module_name] = usr_func_mark
             self.avail_mngng_func[module_name] = mngng_func_avail
 
     # wxapi: handle status message
@@ -249,7 +256,7 @@ class Handler(object):
         # User Pats WindBot
         if self.pat_invoker in vis_content:
             output(vis_content, "PAT", background = "MINT")
-            # CoreFunctions.pat_wb(msgJson)
+            self.handle_pat_wb(msgJson)
 
         # WindBot is Invited into a new Groupchat
         elif all(i in vis_content for i in self.wb_invite_invokers):
@@ -266,6 +273,65 @@ class Handler(object):
             output(f"New User Joined {roomid}. Refreshing...")
             self.msgr.get_wxuser_list()
             self.msgr.send_txt_msg(self.wb_greeting_msg, wxid = roomid)
+
+    # Helper of handle_status_msg. Handles pats
+    def handle_pat_wb(self, msgJson):
+        from_id = msgJson["content"]["id1"]
+        vis_content = msgJson["content"]["content"]
+
+        # If Pat comes from a Chatroom
+        if from_id.endswith("@chatroom"):
+            room_num = from_id.replace("@chatroom", "")
+            usr_nickname = re.match(r"[^[]*\"([^]]*)\"", vis_content).groups()[0]
+            # Getting wxid from usr_nickname
+            wxid_query = self.wb_db.fetch(f"r{room_num}", ["wxid"],\
+                             "groupUsrName", usr_nickname)
+
+            # If the wxid has been updated but not recorded
+            if wxid_query == []:
+                self.msgr.send_txt_msg(self.unlogged_nickname_msg, from_id)
+                # Update the User DB
+                self.msgr.get_wxuser_list()
+                return
+            else:
+                usr_id = wxid_query[0][0]
+        # Pat Comes from DM 
+        else:
+            usr_id = from_id
+        
+        # Increment Recorded patTimes by 1
+        rec_pat_times = self.wb_db.fetch("Users",['patTimes'],\
+                                "wxid", usr_id)[0][0]
+        new_pat_times = rec_pat_times + 1
+        self.wb_db.update("Users","patTimes", new_pat_times,\
+                          "wxid", usr_id)
+
+        # PatAction
+        ## Ban Check
+        if self.banned_check(usr_id) == False:
+            return
+
+        ## Trigger PatAction
+        pat_data = self.wb_db.fetch("Users", ["patAction"],\
+                                    "wxid", usr_id)[0][0]
+        # If user did not bind any action
+        if pat_data == "-1":
+            reply = "您没有绑定PatAction指令。\n"
+            reply += f"示例绑定: {self.BOT_GC_INVOKER} bind pat mb50\n"
+            reply += f"如果您不想再看到这条信息，请使用 {self.BOT_GC_INVOKER} bind pat nop"
+            self.msgr.send_txt_msg(reply, from_id)
+        # User binded action
+        else:
+            call_data = pat_data.split(" ")
+            func_keyword = call_data[0]
+            func_data = call_data[1:]
+
+            if func_keyword not in ["nop", "swym"]:
+                reply = f"正在执行『{pat_data}』"
+                self.msgr.send_txt_msg(reply, from_id)
+
+            self.pre_call(func_keyword, func_data, usr_id ,from_id)
+            return
 
     # wxapi: handle sent message
     def handle_sent_msg(self, msgJson) -> None:
@@ -476,10 +542,23 @@ class Handler(object):
                     self.msgr.send_txt_msg(self.func_disabled_msg,\
                                            destination)
                     return
+
+                execute_args = [func_data, usr_id, destination]
+                ######## WATERPROOF TAPE PATCH ########
+                ## Provide Access to WB Core Data for the Core Module.   
+                if module == "Core":
+                    execute_args.append([self.avail_usr_func,\
+                                         self.avail_mngng_func,\
+                                         self.wb_db,
+                                         self.BOT_GC_INVOKER,
+                                         self.all_func,
+                                         self.marked_usr_func])
+                ######## WATERPROOF TAPE PATCH ########
+
                 # User Functions will be executed in threads
                 tFunc = Thread(target = self.execute_call,\
                                 args = (func_keyword,\
-                                        [func_data, usr_id, destination]))
+                                        execute_args))
                 tFunc.start()
                 return
 
@@ -492,17 +571,30 @@ class Handler(object):
                                            destination)
                     return
 
+                execute_args = [func_data, usr_id, destination]
+                ######## WATERPROOF TAPE PATCH ########
+                ## Provide Access to WB Core Data for the Core Module.   
+                if module == "Core":
+                    execute_args.append([self.avail_usr_func,\
+                                         self.avail_mngng_func,\
+                                         self.wb_db,
+                                         self.BOT_GC_INVOKER,
+                                         self.all_func,
+                                         self.marked_usr_func,
+                                         self.msgr])
+                ######## WATERPROOF TAPE PATCH ########
+
                 # Managing Functions will be blocking
                 self.execute_call(func_keyword,\
-                                    [func_data, usr_id, destination])
+                                    execute_args)
                 return
 
     # Helper of pre_call. Do actual function calling.
-    def execute_call(self, req_func_keyword, func_args) -> None:
+    def execute_call(self, req_func_keyword, execute_args) -> None:
         req_func = self.all_func[req_func_keyword]
-        destination = func_args[2]
+        destination = execute_args[2]
         try:
-            reply_package = req_func(func_args)
+            reply_package = req_func(execute_args)
 
         # Error Happened. Push Error Msg to destination
         except Exception as e:
@@ -527,24 +619,19 @@ class Handler(object):
             self.msgr.send_pic(content, destination)
         return
 
-    # Helper to map call keyword to linked function.
-    def call_2_func(self, keyword):
-        func = self.all_func.get(keyword, None)
-        return func
+    # Helper to retrieve the banned status of calling user.
+    def banned_check(self, wxid) -> bool:
+        caller_ban_status = self.wb_db.fetch("Users",["banned"],\
+                                      "wxid", wxid)[0][0]
+        if bool(caller_ban_status) == True:
+            return False
+        return True
 
     # Helper to retrieve the powerlevel of calling user.
     def power_check(self, wxid, req_power) -> bool:
         caller_lvl = self.wb_db.fetch("Users",["powerLevel"],\
                                       "wxid", wxid)[0][0]
         if caller_lvl < req_power:
-            return False
-        return True
-
-    # Helper to retrieve the banned status of calling user.
-    def banned_check(self, wxid) -> bool:
-        caller_ban_status = self.wb_db.fetch("Users",["banned"],\
-                                      "wxid", wxid)[0][0]
-        if bool(caller_ban_status) == True:
             return False
         return True
 
