@@ -44,6 +44,7 @@ class Arcaea(object):
         self.USER_FUNCTIONS = {
             "arand": self.music_random,
             "agrab": self.grablevel,
+            "ainfo": self.music_search,
         }
         self.MNGNG_FUNCTIONS = {
             "aupdate": self.static_update,
@@ -105,7 +106,6 @@ class Arcaea(object):
 
             if isinstance(resp, dict):
                 song_dict = resp["parse"]["wikitext"]["*"]
-                print(self.STATIC_PATH)
                 with open(os.path.join(self.STATIC_PATH, "song_dict.json"), 'w', \
                         encoding='utf-8') as f:
                     f.write(song_dict)
@@ -277,8 +277,7 @@ class Arcaea(object):
                                 if song_data["id"] == song_id:
                                     artist = song_data["artist"]
                                     title = song_data["title_localized"]["en"]
-                                    title_ja =
-                                    song_data["title_localized"].get("ja", None)
+                                    title_ja = song_data["title_localized"].get("ja", None)
                                     if title_ja != None:
                                         title += f"({title_ja})"
 
@@ -327,8 +326,7 @@ class Arcaea(object):
                                 if song_data["id"] == song_id:
                                     artist = song_data["artist"]
                                     title = song_data["title_localized"]["en"]
-                                    title_ja =
-                                    song_data["title_localized"].get("ja", None)
+                                    title_ja = song_data["title_localized"].get("ja", None)
                                     if title_ja != None:
                                         title += f"({title_ja})"
                                     result_charts.append([title, artist])
@@ -439,17 +437,17 @@ class Arcaea(object):
         return mh.compose_txt_msg(reply)
 
     # fuzzy find music data by title.
-    def _music_by_fuzzy_title(self, title, qratio) -> list:
+    def _music_by_fuzzy_title(self, title, QRatio) -> list:
         music_data = self._music_get(local = True)[0]["songs"]
         results = []
         for song in music_data:
             song_title_en = song["title_localized"].get("en")
             song_title_ja = song["title_localized"].get("ja", None)
             
-            if fuzz.qratio(title.lower(), song_title_en.lower()) >= qratio:
+            if fuzz.QRatio(title.lower(), song_title_en.lower()) >= QRatio:
                 results.append(song)
             elif song_title_ja != None:
-                if fuzz.qratio(title.lower(), song_title_ja.lower()) >= qratio:
+                if fuzz.QRatio(title.lower(), song_title_ja.lower()) >= QRatio:
                     results.append(song)
         return results
     
@@ -512,7 +510,7 @@ class Arcaea(object):
 
         # No Result, try song_id search 
         if len(results) == 0:
-            results = self._music_by_song_id(self, keyword)
+            results = self._music_by_song_id(keyword)
 
         # Still no result
         if len(results) == 0:
@@ -525,8 +523,9 @@ class Arcaea(object):
         # Reasonable Results
         else:
             reply = f"WB找到了以下{len(results)}个结果:"
-            for song in results:
-                reply += self.music_search_build_reply(song)
+            for i in range(len(results)):
+                song = results[i]
+                reply += f"\n[{i+1}] " + self.music_search_build_reply(song)
 
         return mh.compose_txt_msg(reply)
         
