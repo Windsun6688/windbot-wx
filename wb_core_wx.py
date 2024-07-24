@@ -225,6 +225,7 @@ class Handler(object):
         self.avail_usr_func = dict()
         self.marked_usr_func = dict()
         self.avail_mngng_func = dict()
+        self.usr_func_called_ranking = dict()
 
         for m in self.loaded_modules:
             module_instance = self.loaded_modules[m]
@@ -235,10 +236,12 @@ class Handler(object):
 
             usr_func_avail = dict()
             usr_func_mark = dict()
+            usr_func_cnt = dict()
             mngng_func_avail = dict()
             for keyword in user_func:
                 usr_func_avail[keyword] = True
                 usr_func_mark[keyword] = False
+                self.usr_func_called_ranking[keyword] = 0
                 self.all_func[keyword] = user_func[keyword]
 
             for keyword in mngng_func:
@@ -558,7 +561,7 @@ class Handler(object):
                 # User Functions will be executed in threads
                 tFunc = Thread(target = self.execute_call,\
                                 args = (func_keyword,\
-                                        execute_args))
+                                        execute_args, True))
                 tFunc.start()
                 return
 
@@ -575,24 +578,27 @@ class Handler(object):
                 ######## WATERPROOF TAPE PATCH ########
                 ## Provide Access to WB Core Data for the Core Module.   
                 if module == "Core":
-                    execute_args.append([self.avail_usr_func,\
-                                         self.avail_mngng_func,\
+                    execute_args.append([self.avail_usr_func,
+                                         self.avail_mngng_func,
                                          self.wb_db,
                                          self.BOT_GC_INVOKER,
                                          self.all_func,
                                          self.marked_usr_func,
-                                         self.msgr])
+                                         self.msgr,
+                                         self.usr_func_called_ranking])
                 ######## WATERPROOF TAPE PATCH ########
 
                 # Managing Functions will be blocking
                 self.execute_call(func_keyword,\
-                                    execute_args)
+                                    execute_args, False)
                 return
 
     # Helper of pre_call. Do actual function calling.
-    def execute_call(self, req_func_keyword, execute_args) -> None:
+    def execute_call(self, req_func_keyword, execute_args, add_use_cnt) -> None:
         req_func = self.all_func[req_func_keyword]
         destination = execute_args[2]
+        if add_use_cnt:
+            self.usr_func_called_ranking[req_func_keyword] += 1
         try:
             reply_package = req_func(execute_args)
 

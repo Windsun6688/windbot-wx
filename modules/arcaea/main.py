@@ -11,6 +11,7 @@ from ..moduleHelper import ModuleHelper, ModuleMetadata
 # Standard Lib Imports
 import json
 import os
+import re
 
 # Third Party Imports
 from typing import List, Optional, Tuple, Union
@@ -46,6 +47,9 @@ class Arcaea(object):
             "agrab": self.grablevel,
             "ainfo": self.music_search,
             "acinfo": self.music_chart_search,
+            "abpm": self.music_bpm_search,
+            "avs": self.music_artist_vs,
+            "aver": self.music_version_search,
         }
         self.MNGNG_FUNCTIONS = {
             "aupdate": self.static_update,
@@ -73,6 +77,7 @@ class Arcaea(object):
         Template:ComplexArtistsList.json 曲师名义数据JSON
         Template:Song_Length.json 歌曲长度数据JSON
         Template:VersionTime.json 版本上线时间数据JSON
+        Template:Unlocks.json 歌曲解锁关系JSON
         """
 
         pages = {
@@ -82,6 +87,7 @@ class Arcaea(object):
                 "artistlist": "Template%3AComplexArtistsList.json",
                 "songlen": "Template%3ASong_Length.json",
                 "versiontime": "Template%3AVersionTime.json",
+                "unlock": "Template%3AUnlocks.json",
         }
 
         api_page_url = self.ARC_WIKI_API + pages[item]
@@ -273,6 +279,35 @@ class Arcaea(object):
 
         return (pack_data, success)
 
+    # Fetch or Get Locally the song unlock relationship data.
+    def _unlock_get(self, local: bool) -> Tuple[dict,bool]:
+        """
+        Not Local: Get Unlock Relationship From Arcaea Wiki
+        Local: Read Unlock Relationship From Local File
+        """
+
+        success = True
+        if not local:
+            resp = self._arc_wiki_data_get("unlock")
+
+            if isinstance(resp, dict):
+                unlock_data = resp["parse"]["wikitext"]["*"]
+                with open(os.path.join(self.STATIC_PATH, "unlocks.json"),\
+                          "w", encoding="utf-8") as f:
+                    f.write(unlock_data)
+                    f.close()
+            else:
+                output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
+                        'WARNING',background = 'WHITE')
+                local = True
+                success = False
+        if local:
+            with open(os.path.join(self.STATIC_PATH, 'unlocks.json'), 'r', \
+                    encoding='utf-8') as f:
+                unlock_data = json.loads(f.read())
+
+        return (unlock_data, success)
+
     # Updates the local static files.
     def static_update(self, args: list) -> dict:
         status = ["ERROR","OK"]
@@ -281,6 +316,7 @@ class Arcaea(object):
         resp += f"曲包数据: {status[int(self._pack_get(local = False)[1])]}\n"
         resp += f"定数数据: {status[int(self._chart_get(local = False)[1])]}\n"
         resp += f"曲长数据: {status[int(self._music_length_get(local = False)[1])]}\n"
+        resp += f"解锁关系数据: {status[int(self._unlock_get(local = False)[1])]}\n"
         resp += f"复合曲师数据: {status[int(self._complex_artist_get(local = False)[1])]}\n"
         resp += f"版本时间数据: {status[int(self._ver_time_get(local = False)[1])]}\n"
         return mh.compose_txt_msg(resp)
@@ -508,10 +544,41 @@ class Arcaea(object):
     # Music data by artist.
     def _music_by_artist(self, artist) -> list:
         music_data = self._music_get(local = True)[0]["songs"]
+        complex_artist_data = self._complex_artist_get(local = True)[0]
         results = []
+
+        # Lower for better match.
+        target_artist = artist.lower()
+
         for song in music_data:
-            if song["artist"] == artist:
+            song_artist = song["artist"]
+            song_artist_multi_lang = list()
+            for lan in song["search_artist"]:
+                song_artist_multi_lang += song["search_artist"][lan]
+
+            # Direct Match
+            if song_artist.lower() == target_artist:
                 results.append(song)
+            # Search Multi-lang
+            elif target_artist in song_artist_multi_lang:
+                results.append(song)
+            # Check complex_artist_data
+            else:
+                if song_artist in complex_artist_data:
+                    artist_breakdown = complex_artist_data[song_artist]
+                    for sub_artist in artist_breakdown:
+                        sub_artist_alias = artist_breakdown.get(sub_artist, None)
+                        if sub_artist.lower() == target_artist:
+                            results.append(song)
+                            continue
+                        elif not sub_artist_alias:
+                            continue
+                        elif isinstance(sub_artist_alias, list):
+                            continue
+                        elif sub_artist_alias.lower() == target_artist:
+                            results.append(song)
+                            continue
+
         return results
 
     # Music data by BPM.
@@ -519,8 +586,17 @@ class Arcaea(object):
         music_data = self._music_get(local = True)[0]["songs"]
         results = []
         for song in music_data:
-            if int(song["bpm"]) == bpm:
-                results.append(song)
+            song_bpm = song["bpm"]
+            # Constant BPM
+            if song_bpm.isnumeric():
+                if int(song_bpm) == bpm:
+                    results.append(song)
+            # Varaiable BPM
+            else:
+                song_bpm_info = [int(s) for s in re.findall(r'\b\d+\b', song_bpm)]
+                if bpm in song_bpm_info:
+                    results.append(song)
+
         return results
 
     # Music data by version.
@@ -657,7 +733,7 @@ class Arcaea(object):
         return song_info_str
         
     # The user's Arcaea Chart Search.
-    def music_chart_search(self, args) -> list:
+    def music_chart_search(self, args) -> dict:
         func_data = args[0]
         precise_rate = 90
 
@@ -734,3 +810,110 @@ class Arcaea(object):
                 reply += f"Charter: {chart_designer} | Jacket: {jacket_designer}"
 
         return mh.compose_txt_msg(reply)
+
+    # The user's Arcaea Music BPM Search.
+    def music_bpm_search(self, args) -> dict:
+        func_data = args[0]
+
+        # Blank Input
+        if len(func_data) == 0:
+            reply = "请提供BPM。"
+            return mh.compose_txt_msg(reply)
+
+        # User input BPM filtering
+        target_bpm = func_data[0]
+        if not target_bpm.isnumeric():
+            reply = "请提供纯数字BPM。"
+            return mh.compose_txt_msg(reply)
+        target_bpm = int(target_bpm)
+
+        # Search
+        results = self._music_by_bpm(target_bpm)
+
+        # No result
+        if len(results) == 0:
+            reply = f"WB没有找到{target_bpm}BPM的歌曲。"
+        else:
+            reply = f"WB找到了{len(results)}首在{target_bpm}BPM的歌曲："
+            for i in range(len(results)):
+                song_data = results[i]
+                song_idx = song_data["idx"]
+
+                artist = song_data["artist"]
+                title = song_data["title_localized"]["en"]
+                title_ja = song_data["title_localized"].get("ja", None)
+                if title_ja != None:
+                    title += f"({title_ja})"
+
+                reply += f"\n[{i+1}] {artist} - {title} <SIDX{song_idx}>"
+
+        return mh.compose_txt_msg(reply)
+
+    # The user's Arcaea artist VS.
+    def music_artist_vs(self, args) -> dict:
+        func_data = args[0]
+
+        # Blank Input
+        if len(func_data) == 0:
+            reply = "请提供作曲家。"
+            return mh.compose_txt_msg(reply)
+        
+        artist = " ".join(func_data)
+
+        # Search
+        results = self._music_by_artist(artist)
+
+        # No result
+        if len(results) == 0:
+            reply = f"WB没有找到{artist}的歌曲。"
+        # Reasonable Result
+        else:
+            reply = f"如果您想大战{artist}，您可以选："
+            for i in range(len(results)):
+                song_data = results[i]
+                song_idx = song_data["idx"]
+
+                artist = song_data["artist"]
+                title = song_data["title_localized"]["en"]
+                title_ja = song_data["title_localized"].get("ja", None)
+                if title_ja != None:
+                    title += f"({title_ja})"
+
+                reply += f"\n[{i+1}] {artist} - {title} <SIDX{song_idx}>"
+
+        return mh.compose_txt_msg(reply)
+
+    # The user's Arcaea Version Music Search.
+    def music_version_search(self, args) -> dict:
+        func_data = args[0]
+
+        # Blank Input
+        if len(func_data) == 0:
+            reply = "请提供版本 （x.x）。"
+            return mh.compose_txt_msg(reply)
+
+        target_version = func_data[0]
+
+        # Search
+        results = self._music_by_version(target_version)
+
+        # No result
+        if len(results) == 0:
+            reply = f"WB没有找到Ver{target_version}的歌曲。"
+        # Reasonable Result
+        else:
+            reply = f"WB找到了{len(results)}首Ver{target_version}的歌曲："
+            for i in range(len(results)):
+                song_data = results[i]
+                song_idx = song_data["idx"]
+
+                artist = song_data["artist"]
+                title = song_data["title_localized"]["en"]
+                title_ja = song_data["title_localized"].get("ja", None)
+                if title_ja != None:
+                    title += f"({title_ja})"
+
+                reply += f"\n[{i+1}] {artist} - {title} <SIDX{song_idx}>"
+
+        return mh.compose_txt_msg(reply)
+

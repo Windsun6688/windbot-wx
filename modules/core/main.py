@@ -50,6 +50,7 @@ class Core(object):
             "announce": self.announce,
             "annswitch": self.announce_switch,
             "annview": self.announce_list,
+            "funccnt": self.func_called_rank,
         }
         self.STATIC_PATH = mh.compose_static_path("core")
 
@@ -93,6 +94,7 @@ class Core(object):
 
     # List Management Functions
     def list_functions_mng(self, args):
+        print("CALLED list_mng")
         avail_mng_func = args[-1][1]
 
         current_date = time.strftime("%Y-%m-%d")
@@ -415,4 +417,25 @@ class Core(object):
             reply += f"{group[1]} ( {group[0]} ): {bool(group[2])}\n"
 
         return mh.compose_txt_msg(reply)
+
+    # View the most called Function
+    def func_called_rank(self, args):
+        func_called_times = args[-1][7]
+        end_valve = 0
+
+        current_date = time.strftime("%Y-%m-%d")
+        reply = f"从开机至现在({current_date})指令调用数量:"
+        for keyword in sorted(func_called_times,\
+                              key = func_called_times.get,\
+                              reverse = True):
+            called_cnt = func_called_times[keyword]
+            if called_cnt <= end_valve:
+                break
+            else:
+                reply += f"\n{keyword} - {called_cnt}次"
+
+        return mh.compose_txt_msg(reply)
+
+
+
 
