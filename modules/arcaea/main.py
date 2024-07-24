@@ -45,6 +45,7 @@ class Arcaea(object):
             "arand": self.music_random,
             "agrab": self.grablevel,
             "ainfo": self.music_search,
+            "acinfo": self.music_chart_search,
         }
         self.MNGNG_FUNCTIONS = {
             "aupdate": self.static_update,
@@ -54,7 +55,9 @@ class Arcaea(object):
         self.ARC_WIKI_API = "https://arcwiki.mcd.blue/api.php?action=parse&format=json&curtimestamp=1&redirects=1&prop=wikitext&page="
 
         self.DIFF_LIST = ["PST", "PRS", "FTR", "BYD", "ETR"]
-        self.SONG_SIDES = ["光", "对立", "无色"]
+        self.SONG_SIDES = ["光", "对立", "消色"]
+        self.UNLOCK_TXT = ["无需爬梯解锁", "需要爬梯解锁"]
+        self.DL_TXT = ["无需下载","需要下载"]
 
     def get_module_meta(self) -> ModuleMetadata:
         return self.META
@@ -66,6 +69,7 @@ class Arcaea(object):
 
         Template%3AChartConstant.json 定数JSON
         Template%3ASonglist.json 歌曲数据JSON
+        Template%3APacklist.json 曲包数据JSON
         Template:ComplexArtistsList.json 曲师名义数据JSON
         Template:Song_Length.json 歌曲长度数据JSON
         Template:VersionTime.json 版本上线时间数据JSON
@@ -74,6 +78,7 @@ class Arcaea(object):
         pages = {
                 "constant": "Template%3AChartConstant.json",
                 "songlist": "Template%3ASonglist.json",
+                "packlist": "Template%3APacklist.json",
                 "artistlist": "Template%3AComplexArtistsList.json",
                 "songlen": "Template%3ASong_Length.json",
                 "versiontime": "Template%3AVersionTime.json",
@@ -239,11 +244,41 @@ class Arcaea(object):
 
         return (version_time_data, success)
 
+    # Fetch or Get Locally the version update date data.
+    def _pack_get(self, local: bool) -> Tuple[dict,bool]:
+        """
+        Not Local: Get Pack Data From Arcaea Wiki
+        Local: Read Pack Data From Local File
+        """
+
+        success = True
+        if not local:
+            resp = self._arc_wiki_data_get("packlist")
+
+            if isinstance(resp, dict):
+                pack_data = resp["parse"]["wikitext"]["*"]
+                with open(os.path.join(self.STATIC_PATH, "pack_dict.json"),\
+                          "w", encoding="utf-8") as f:
+                    f.write(pack_data)
+                    f.close()
+            else:
+                output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
+                        'WARNING',background = 'WHITE')
+                local = True
+                success = False
+        if local:
+            with open(os.path.join(self.STATIC_PATH, 'pack_dict.json'), 'r', \
+                    encoding='utf-8') as f:
+                pack_data = json.loads(f.read())
+
+        return (pack_data, success)
+
     # Updates the local static files.
     def static_update(self, args: list) -> dict:
         status = ["ERROR","OK"]
         resp = "更新结果:\n"
         resp += f"曲目数据: {status[int(self._music_get(local = False)[1])]}\n"
+        resp += f"曲包数据: {status[int(self._pack_get(local = False)[1])]}\n"
         resp += f"定数数据: {status[int(self._chart_get(local = False)[1])]}\n"
         resp += f"曲长数据: {status[int(self._music_length_get(local = False)[1])]}\n"
         resp += f"复合曲师数据: {status[int(self._complex_artist_get(local = False)[1])]}\n"
@@ -304,7 +339,7 @@ class Arcaea(object):
             title_ja = song_data["title_localized"].get("ja", None)
             if title_ja != None:
                 title += f"({title_ja})"
-            result_charts.append([title, artist])
+            result_charts = [[title, artist]]
 
         else:
             diff = func_data[0]
@@ -457,39 +492,48 @@ class Arcaea(object):
         result = []
         for song in music_data:
             if song["id"] == song_id:
-                results.append(song)
+                result.append(song)
                 break
+        return result
+
+    # Music data by song index.
+    def _music_by_song_idx(self, song_idx) -> list:
+        music_data = self._music_get(local = True)[0]["songs"]
+        result = []
+        for song in music_data:
+            if song["idx"] == song_idx:
+                result.append(song)
         return result
 
     # Music data by artist.
     def _music_by_artist(self, artist) -> list:
         music_data = self._music_get(local = True)[0]["songs"]
-        result = []
+        results = []
         for song in music_data:
             if song["artist"] == artist:
                 results.append(song)
-        return result
+        return results
 
     # Music data by BPM.
     def _music_by_bpm(self, bpm) -> list:
         music_data = self._music_get(local = True)[0]["songs"]
-        result = []
+        results = []
         for song in music_data:
             if int(song["bpm"]) == bpm:
                 results.append(song)
-        return result
+        return results
 
     # Music data by version.
     def _music_by_version(self, version) -> list:
         music_data = self._music_get(local = True)[0]["songs"]
-        result = []
+        results = []
         for song in music_data:
             if song["version"] == version:
                 results.append(song)
-        return result
+        return results
 
     # The user's Arcaea Song Search.
-    def music_search(self, args) -> list:
+    def music_search(self, args) -> dict:
         func_data = args[0]
         fuzzy_rate = 65
         precise_rate = 90
@@ -506,11 +550,16 @@ class Arcaea(object):
         # Precise Search
         else:
             keyword = " ".join(func_data)
-            results = self._music_by_fuzzy_title(keyword, precise_rate)
+            ## song_idx search
+            if keyword.isnumeric():
+                results = self._music_by_song_idx(int(keyword))
+            ## Song name precise search
+            else:
+                results = self._music_by_fuzzy_title(keyword, precise_rate)
 
         # No Result, try song_id search 
         if len(results) == 0:
-            results = self._music_by_song_id(keyword)
+            results = self._music_by_song_id(keyword.lower())
 
         # Still no result
         if len(results) == 0:
@@ -525,13 +574,17 @@ class Arcaea(object):
             reply = f"WB找到了以下{len(results)}个结果:"
             for i in range(len(results)):
                 song = results[i]
-                reply += f"\n[{i+1}] " + self.music_search_build_reply(song)
+                reply += f"\n[{i+1}] " + self._music_search_build_reply(song)
 
         return mh.compose_txt_msg(reply)
         
     # Helper of music_search.
-    def music_search_build_reply(self, song_data):
+    def _music_search_build_reply(self, song_data) -> str:
         song_info_str = ""
+
+        # Song ID
+        song_id = song_data["id"]
+        song_idx = song_data["idx"]
 
         # Artist and Song Title
         artist = song_data["artist"]
@@ -543,7 +596,141 @@ class Arcaea(object):
 
         # BPM and Song Length
         bpm = song_data["bpm"]
+        length_data = self._music_length_get(local = True)[0]
+        song_length = length_data["normal"][song_id]
+        song_info_str += f"\n- BPM {bpm} | 时长 {song_length}"
+
+        # Side, Pack, and Version
+        song_version = song_data["version"]
+        song_pack_id = song_data["set"]
+        pack_data = self._pack_get(local = True)[0]["packs"]
+        for pack_info in pack_data:
+            if pack_info["id"] == song_pack_id:
+                ## Check for parent pack
+                pack_parent_id = pack_info.get("pack_parent", None)
+                song_pack = pack_info["name_localized"]["en"]
+                if pack_parent_id:
+                    for pack in pack_data:
+                        if pack["id"] == pack_parent_id:
+                            parent_name = pack["name_localized"]["en"]
+                            song_pack = f"{parent_name} - {song_pack}"
+                break
+        song_info_str += f"\n-- 版本{song_version} | {song_pack}" 
+
+        # World Mode Unlock Info and Verision
+        need_unlock = self.UNLOCK_TXT[int(song_data.get("world_unlock", False))]
+        need_dl = self.DL_TXT[int(song_data.get("remote_dl", False))]
+        song_side = self.SONG_SIDES[song_data["side"]]
+        song_info_str += f"\n--- {need_unlock} | {need_dl} | {song_side}侧"
+
+        # Song ID Info
+        song_info_str += f"\n---- SID {song_id} | SIDX {song_idx}"
+        
+        # Audio Overrides at different difficulties
+        charts = song_data["difficulties"]
+        for chart_info in charts:
+            audio_override = chart_info.get("audioOverride", False)
+            if audio_override:
+                override_diff_num = chart_info.get("ratingClass")
+                override_diff = self.DIFF_LIST[override_diff_num]
+
+                override_artist = chart_info.get("artist", artist)
+                override_title = chart_info["title_localized"]["en"]
+
+                override_bpm = chart_info.get("bpm", bpm)
+                override_length = length_data["beyond"][song_id]
+
+                override_const_base = str(chart_info.get("rating"))
+                override_const_plus = chart_info.get("ratingPlus", False)
+                if override_const_plus:
+                    override_const_base += "+"
+                override_diff += f"[{override_const_base}]"
+
+                override_version = chart_info.get("version", song_version)
+
+                song_info_str += f"\n==={override_diff} OVERRIDE==="
+                song_info_str += f"\n{override_artist} - {override_title}"
+                song_info_str += f"\n- BPM{override_bpm} | 时长{override_length}"
+                song_info_str += f"\n-- 版本{override_version}"
+                song_info_str += f"\n==={override_diff} OVERRIDE==="
 
         return song_info_str
         
+    # The user's Arcaea Chart Search.
+    def music_chart_search(self, args) -> list:
+        func_data = args[0]
+        precise_rate = 90
 
+        # Blank Input
+        if len(func_data) == 0:
+            reply = "请提供搜索词。"
+            return mh.compose_txt_msg(reply)
+
+        # Precise Search
+        keyword = " ".join(func_data)
+        ## song_idx search
+        if keyword.isnumeric():
+            results = self._music_by_song_idx(int(keyword))
+        ## Song name precise search
+        else:
+            results = self._music_by_fuzzy_title(keyword, precise_rate)
+
+        # No Result, try song_id search 
+        if len(results) == 0:
+            results = self._music_by_song_id(keyword.lower())
+
+        # Still no result
+        if len(results) == 0:
+            reply = f"WB没有找到结果。您查找了：{keyword}"
+
+        # Reasonable Result
+        else:
+            const_data = self._chart_get(local = True)[0]
+            song_data = results[0]
+            reply = ""
+
+            # Song ID, Artist, Title
+            song_id = song_data.get("id")
+            artist = song_data.get("artist")
+            title = song_data["title_localized"].get("en", "???")
+            reply += f"{artist} - {title}"
+
+            # Difficulties
+            for chart_info in song_data["difficulties"]:
+                ## Rating Class, Chart Design, Jacket Design
+                diff_num = chart_info["ratingClass"]
+                rating_class = self.DIFF_LIST[diff_num]
+                chart_designer = chart_info["chartDesigner"].replace("\n", " ")
+                jacket_designer = chart_info.get("jacketDesigner", "N/A")
+                if jacket_designer == "":
+                    jacket_designer = "N/A"
+
+                # Hidden
+                is_hidden = chart_info.get("hidden_until_unlocked", False)
+                hidden_until = chart_info.get("hidden_until", None)
+                if is_hidden or hidden_until:
+                    if hidden_until == "always":
+                        continue
+                    elif hidden_until == "difficulty":
+                        hidden_txt = "[隐] "
+                    elif hidden_until == "song":
+                        hidden_txt = ""
+                    elif hidden_until == "none":
+                        hidden_txt = ""
+                    else:
+                        hidden_txt = ""
+                else:
+                    hidden_txt = ""
+
+                # Chart Constant
+                const_base = str(chart_info.get("rating"))
+                const_plus = chart_info.get("ratingPlus", False)
+                if const_plus:
+                    const_base += "+"
+                const_precise = const_data[song_id][diff_num]["constant"]
+
+                reply += f"\n{hidden_txt}{rating_class} "
+                reply += f"{const_base}({const_precise}) | "
+                reply += f"Charter: {chart_designer} | Jacket: {jacket_designer}"
+
+        return mh.compose_txt_msg(reply)

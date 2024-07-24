@@ -10,10 +10,10 @@ class SQLHelper(object):
         self.db_path = db_path
 
     def connect(self) -> sqlite3.Connection:
-         return sqlite3.connect(self.db_path)
+        return sqlite3.connect(self.db_path)
     
     def cursor(self, connection) -> sqlite3.Cursor:
-         return connection.cursor()
+        return connection.cursor()
 
     # Execute a SQL Command. Returns False if Exception Occurred
     def execute(self, sql_cmd) -> bool:
