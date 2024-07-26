@@ -72,7 +72,7 @@ class Messenger(object):
             'ext': 'null'
         }
         self.ws.send(json.dumps(ws_data))
-        output(f'{msg} -> {wxid}','SEND')
+        output(f'{msg} -> {wxid}\n','SEND')
 
     # Tells websocket wxapi to send an attachment.
     def send_attach(self, filepath:str, wxid:str = 'null') -> None:
@@ -86,7 +86,7 @@ class Messenger(object):
             'ext': 'null'
         }
         self.ws.send(json.dumps(ws_data))
-        output(f'File @ {filepath} -> {wxid}','SEND')
+        output(f'File @ {filepath} -> {wxid}\n','SEND')
 
     # Tells websocket wxapi to send a (picture) attachment. (Rarely Used)
     def send_pic(self, filepath:str, wxid:str = 'null') -> None:

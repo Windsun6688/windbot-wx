@@ -556,6 +556,11 @@ class Handler(object):
                                          self.BOT_GC_INVOKER,
                                          self.all_func,
                                          self.marked_usr_func])
+                ## Provide Access to WB Data for the Maimai Module.
+                elif module == "Maimai":
+                    execute_args.append([self.wb_db,\
+                                         self.BOT_GC_INVOKER])
+
                 ######## WATERPROOF TAPE PATCH ########
 
                 # User Functions will be executed in threads

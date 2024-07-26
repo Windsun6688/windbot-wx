@@ -26,7 +26,7 @@ __module_meta__ = ModuleMetadata(
     desc =  "Windbot Arcaea Module",
     extra = {
         "moduleuid": "arcaea",
-        "version": "0.0.1",
+        "version": "0.0.2",
         "author": ["Windsun"],
     }
 )
@@ -679,18 +679,21 @@ class Arcaea(object):
         # Side, Pack, and Version
         song_version = song_data["version"]
         song_pack_id = song_data["set"]
-        pack_data = self._pack_get(local = True)[0]["packs"]
-        for pack_info in pack_data:
-            if pack_info["id"] == song_pack_id:
-                ## Check for parent pack
-                pack_parent_id = pack_info.get("pack_parent", None)
-                song_pack = pack_info["name_localized"]["en"]
-                if pack_parent_id:
-                    for pack in pack_data:
-                        if pack["id"] == pack_parent_id:
-                            parent_name = pack["name_localized"]["en"]
-                            song_pack = f"{parent_name} - {song_pack}"
-                break
+        if song_pack_id == "single":
+            song_pack = "Memory Archive"
+        else:
+            pack_data = self._pack_get(local = True)[0]["packs"]
+            for pack_info in pack_data:
+                if pack_info["id"] == song_pack_id:
+                    ## Check for parent pack
+                    pack_parent_id = pack_info.get("pack_parent", None)
+                    song_pack = pack_info["name_localized"]["en"]
+                    if pack_parent_id:
+                        for pack in pack_data:
+                            if pack["id"] == pack_parent_id:
+                                parent_name = pack["name_localized"]["en"]
+                                song_pack = f"{parent_name} - {song_pack}"
+                    break
         song_info_str += f"\n-- 版本{song_version} | {song_pack}" 
 
         # World Mode Unlock Info and Verision
