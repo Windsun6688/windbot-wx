@@ -368,41 +368,41 @@ class Arcaea(object):
     # Randomly select a song from a given difficulty (or all if not given).
     def music_random(self, args: list) -> dict:
         func_data = args[0]
+        music_data = self._music_get(local = True)[0]["songs"]
+        const_data = self._chart_get(local = True)[0]
+        
+        # User does not provide input, Wildcard Search
         if len(func_data) == 0:
-            song_data = random.choice(self._music_get(local = True)[0]["songs"])
-            artist = song_data["artist"]
-            title = song_data["title_localized"]["en"]
-            title_ja = song_data["title_localized"].get("ja", None)
-            if title_ja != None:
-                title += f"({title_ja})"
-            result_charts = [[title, artist]]
+            result_songs = music_data
 
+        # Precise Random
+        elif func_data[0].lower() == "p":
+            result_songs = list()
+            target_const = func_data[1]
+
+            for song_id in const_data:
+                for chart_data in const_data[song_id]:
+                    if chart_data == None:
+                        continue
+                    const = chart_data["constant"]
+                    if float(target_const) == const:
+                        result_songs += self._music_by_song_id(song_id)
+
+        # General Random
         else:
-            diff = func_data[0]
+            result_songs = []
+            target_diff = func_data[0]
+            for song in music_data:
+                for chart_data in song["difficulties"]:
+                    diff = str(chart_data["rating"])
+                    diff_plus = chart_data.get("ratingPlus", None)
+                    if diff_plus:
+                        diff += "+"
+                    if diff == target_diff:
+                        result_songs.append(song)
 
-            if "+" in diff:
-                reply = "您需要指明具体定数。"
-                return mh.compose_txt_msg(reply)
-            else:
-                result_charts = []
-                music_data = self._music_get(local = True)[0]["songs"]
-                const_data = self._chart_get(local = True)[0]
-                for song_id in const_data:
-                    for i in range(len(const_data[song_id])):
-                        # handles etr
-                        chart = const_data[song_id][i]
-                        if chart != None and chart["constant"] == float(diff):
-                            # find the music info.
-                            for song_data in music_data:
-                                if song_data["id"] == song_id:
-                                    artist = song_data["artist"]
-                                    title = song_data["title_localized"]["en"]
-                                    title_ja = song_data["title_localized"].get("ja", None)
-                                    if title_ja != None:
-                                        title += f"({title_ja})"
-                                    result_charts.append([title, artist])
-        if len(result_charts) == 0:
-            reply = "wb没有在该难度找到谱面。"
+        if len(result_songs) == 0:
+            reply = "WB没有在该难度找到谱面。"
         else:
             reply_format = [
                 "当然可以！推荐songname这首曲子，它的节奏很有弹性，旋律清新动听，能给玩家带来非常愉悦的音乐体验。它深受许多arcaea玩家的喜爱，特别是跳级玩家爱不释手，你也值得一试。但要注意，不要被其节奏迷惑，千万不要跟丢哦！",\
@@ -498,10 +498,14 @@ class Arcaea(object):
                 "当然可以！我再给您推荐一首songname。这首的节奏非常紧凑跳跃，充满着冒险的感觉。在色彩缤纷的背景音下，尤其是钢琴的部分，很容易让人深深印象，让您在游戏过程中彻底沉浸。跟着它的节奏一起跳跃，一起瞬间爆发，带领我们进入充满兴奋和活力的音乐旅程！",\
                 "当然可以！推荐songname，这是一首非常欢快的歌曲，听起来充满活力和节奏感。曲中节奏变化多样，音符跃动特别灵动，让人难以坐底。无论是听得还是演奏都非常有趣，绝对是一首让人心情愉悦的曲子！"]
 
-            rand_song = random.choice(result_charts) 
+            chosen_song = random.choice(result_songs)
+            artist = chosen_song["artist"]
+            title = chosen_song["title_localized"]["en"]
+            title_ja = chosen_song["title_localized"].get("ja", None)
+            if title_ja != None:
+                title += f"({title_ja})"
+
             format = random.choice(reply_format)
-            title = rand_song[0]
-            artist = rand_song[1]
             reply = format.replace("songname", title)
             reply = reply.replace("artist", artist)
 

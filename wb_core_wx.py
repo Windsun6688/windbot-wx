@@ -348,30 +348,29 @@ class Handler(object):
                                             .replace('&gt;','>')
         soup = BeautifulSoup(msgXml, features = "xml")
 
-        try:
-            if soup.appname.string == "哔哩哔哩":
-                bili_text = f"BiliBili Video: {soup.title.string}"
-                bili_text += f"\nURL: {soup.url.string}"
-                output(bili_text, logtype = 'GROUPCHAT')
+        if soup.appname.string == "哔哩哔哩":
+            bili_text = f"BiliBili Video: {soup.title.string}"
+            bili_text += f"\nURL: {soup.url.string}"
+            output(bili_text, logtype = "GROUPCHAT")
+            return
 
-        except Exception as e:
-            # XMLs are used in refermsg as well
-            refmsg = soup.refermsg
+        # XMLs are used in refermsg as well
+        refmsg = soup.refermsg
 
-            msgJson = {
-                'content':soup.select_one('title').text,
-                'refcontent': refmsg.select_one('content').text,
-                'refnick': refmsg.select_one('displayname').text,
-                'id':msgJson['id'],
-                'id1':msgJson['content']['id2'],
-                'id2': refmsg.select_one('chatusr').text,
-                'id3':'',
-                'srvid':msgJson['srvid'],
-                'time':msgJson['time'],
-                'type':msgJson['type'],
-                'wxid':msgJson['content']['id1']
-            }
-            self.handle_recv_msg(msgJson)
+        msgJson = {
+            'content':soup.select_one('title').text,
+            'refcontent': refmsg.select_one('content').text,
+            'refnick': refmsg.select_one('displayname').text,
+            'id':msgJson['id'],
+            'id1':msgJson['content']['id2'],
+            'id2': refmsg.select_one('chatusr').text,
+            'id3':'',
+            'srvid':msgJson['srvid'],
+            'time':msgJson['time'],
+            'type':msgJson['type'],
+            'wxid':msgJson['content']['id1']
+        }
+        self.handle_recv_msg(msgJson)
 
     # wxapi: handle at message * Doesn't Work As Expected. Archived Here
     def handle_at_msg(self, msgJson) -> None:

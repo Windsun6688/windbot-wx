@@ -50,6 +50,9 @@ class Maimai(object):
         self.META = __module_meta__
         self.USER_FUNCTIONS = {
             "mb50": self.maimai_b50,
+            "mrand": self.music_random,
+            "minfo": self.music_search,
+            "mgrade": self.view_single_grade,
         }
         self.MNGNG_FUNCTIONS = {
             "mupdate": self.static_update,
@@ -70,6 +73,9 @@ class Maimai(object):
         self.MAI_ALIAS_API = "https://api.yuzuchan.moe/maimaidx"
         self.DIVING_FISH_WEBSITE = "https://www.diving-fish.com/maimaidx/prober/"
         self.DIVING_FISH_GUIDE = "https://www.diving-fish.com/maimaidx/prober_guide"
+
+        self.DIFF_LIST = ["Basic", "Advanced", "Expert", "Master", "RE:Master"]
+        self.DIFF_LIST_SHORT = ["BAS", "ADV", "EXP", "MAS", "REM"]
 
         self.JPVER_2_CNVER = {
             "maimai": "maimai",
@@ -209,20 +215,24 @@ class Maimai(object):
         - single: 部分指定数据
         """
 
-        headers = {'developer-token': self.dev_token}
-        params = {'username': gamertag}
+        headers = {"developer-token": self.dev_token}
+        params = {"username": gamertag}
 
         if func == "records":
             method = "/dev/player/records"
+            comm_method = "GET"
         elif func == "single":
             method = "/dev/player/record"
             params["music_id"] = music_id
+            comm_method = "POST"
         else:
             return 0
 
         url = self.MAI_DATA_API + method
-
-        return self._request("GET", url, headers = headers, params = params)
+        if func == "records":
+            return self._request(comm_method, url, headers = headers, params = params)
+        else:
+            return self._request(comm_method, url, headers = headers, json = params)
     
     # Gets Music data from diving-fish API.
     def _api_data_get(self, func:str):
@@ -371,7 +381,7 @@ class Maimai(object):
 
     ######## Draw Maimai Best 50 Image ########
     # Drawing the best image.
-    def draw_best_image(self, gamertag: str):
+    def _draw_best_image(self, gamertag: str):
         # Get User Data
         user_data = self._api_query_user(gamertag, "b50")
         if user_data == -2:
@@ -497,7 +507,7 @@ class Maimai(object):
                 return mh.compose_txt_msg(reply)
 
         # Draw the Image
-        image = self.draw_best_image(gamertag)
+        image = self._draw_best_image(gamertag)
 
         # If error happened in image drawing 
         if isinstance(image, int):
@@ -519,6 +529,237 @@ class Maimai(object):
             storage_path = os.path.join(self.MAI_BEST_IMG_PATH, f"{gamertag}.png")
             image.save(storage_path, optimize=True, quality=60)
             return mh.compose_attach_msg(storage_path)
+
+    ######## Helper Functions ########
+    # Fuzzy find music data by title.
+    def _music_by_fuzzy_title(self, title, QRatio) -> list:
+        music_data = self._music_get(local = True)[0]
+        results = list()
+        for song in music_data:
+            song_title = song["title"]
+            
+            if fuzz.QRatio(title.lower(), song_title.lower()) >= QRatio:
+                results.append(song)
+        return results
+
+    # Find music data by song_id 
+    def _music_by_id(self, song_id: int) -> list:
+        music_data = self._music_get(local = True)[0]
+        result = list()
+
+        for song in music_data:
+            if song["id"] == str(song_id):
+                result.append(song)
+        return result
+
+    ######## User Functions ########
+    # Random
+    def music_random(self, args):
+        func_data = args[0]
+        music_data = self._music_get(local = True)[0]
+        random_type = None
+
+        # If user does not specify level, do all random
+        if len(func_data) == 0:
+            random_type = "wildcard"
+            result_songs = music_data
+
+        # Precise level indicator
+        elif func_data[0].lower() == "p":
+            random_type = "precise"
+            result_songs = list()
+            const = func_data[1]
+            for song in music_data:
+                if float(const) in song["ds"]:
+                    result_songs.append(song)
+
+        # General level indicator
+        else:
+            random_type = "general"
+            result_songs = list()
+            level = func_data[0]
+            for song in music_data:
+                if level in song["level"]:
+                    result_songs.append(song)
+
+        # If no results found
+        if len(result_songs) == 0:
+            reply = f"WB没有找到歌曲。"
+            return mh.compose_txt_msg(reply)
+
+        # Random
+        chosen_song_data = random.choice(result_songs)
+
+        # Build Reply
+        reply = f"WB为您从{len(result_songs)}首歌曲中选择了:\n"
+
+        title = chosen_song_data["basic_info"]["title"]
+        artist = chosen_song_data["basic_info"]["artist"]
+        genre = chosen_song_data["basic_info"]["genre"]
+        song_id = chosen_song_data["id"]
+        chart_type = chosen_song_data["type"]
+
+        # Different Reply based on random type
+        if random_type == "precise":
+            for i in range(len(chosen_song_data["ds"])):
+                if float(const) == chosen_song_data["ds"][i]:
+                    level_diff = self.DIFF_LIST_SHORT[i]
+            reply += f"[{chart_type} {level_diff} {const}] {artist} - {title}\n"
+
+        elif random_type == "general":
+            for i in range(len(chosen_song_data["level"])):
+                if level == chosen_song_data["level"][i]:
+                    level_diff = self.DIFF_LIST_SHORT[i]
+            reply += f"[{chart_type} {level_diff} {level}] {artist} - {title}\n"
+
+        elif random_type == "wildcard":
+            max_diff = len(chosen_song_data["level"])
+            random_diff = random.randint(0, max_diff - 1)
+
+            level_diff = self.DIFF_LIST_SHORT[random_diff]
+            const = chosen_song_data["ds"][random_diff]
+
+            reply += f"[{chart_type} {level_diff} {const}] {artist} - {title}\n"
+
+        reply += f"分区：{genre} | SID {song_id}"
+        return mh.compose_txt_msg(reply)
+
+    # The user's Maimai Info Search.
+    def music_search(self, args):
+        func_data = args[0]
+        search_type = None
+
+        # No Data Provided
+        if len(func_data) == 0:
+            reply = "请提供搜索的乐曲标题或SID。"
+            return mh.compose_txt_msg(reply)
+
+        # Precise search
+        if func_data[0].lower() == "p":
+            search_type = "precise"
+            keyword = " ".join(func_data[1:])
+            results = self._music_by_fuzzy_title(keyword, 90)
+
+        # Fuzzy Search & Song ID Search
+        else:
+            keyword = " ".join(func_data)
+
+            # Song ID Search
+            if keyword.isnumeric():
+                search_type = "sid"
+                results = self._music_by_id(int(keyword))
+
+            # Fuzzy Search [DEFAULT]
+            else:
+                search_type = "fuzzy"
+                results = self._music_by_fuzzy_title(keyword, 65)
+
+        # No Results
+        if len(results) == 0:
+            if search_type == "sid":
+                reply = f"WB没有搜寻到结果。您查找了SID: {keyword}"
+            else:
+                reply = f"WB没有搜寻到结果。您查找了: {keyword}"
+            return mh.compose_txt_msg(reply)
+
+        # Too Many Results 
+        elif len(results) > 5:
+            reply = "WB找到的结果过多（很沉！>_<）。\n"
+            reply += "请尝试优化搜索词。"
+            return mh.compose_txt_msg(reply)
+
+        # Reasonable Results
+        reply = f"共找到以下{len(results)}个结果:"
+        for song in results:
+            song_id = song["id"]
+            title = song["title"]
+            chart_type = song["type"]
+
+            artist = song["basic_info"]["artist"]
+            JP_version = song["basic_info"]["from"]
+            CN_version = self.JPVER_2_CNVER.get(JP_version, JP_version)
+            category = song["basic_info"]["genre"]
+            bpm = song["basic_info"]["bpm"]
+            new_txt = "" if song["basic_info"]["is_new"] == False else " [NEW]"
+
+            diffs_info = list()
+            for i in range(len(song["ds"])):
+                diff = self.DIFF_LIST_SHORT[i]
+                const = song["ds"][i]
+                diff_str = f"{diff}{const}"
+                diffs_info.append(diff_str) 
+            diffs_info_str = " | ".join(diffs_info)
+
+            reply += f"\n[{chart_type}]{new_txt} {artist} - {title}"
+            reply += f"\n-版本：{CN_version} | 分区：{category} | BPM{bpm}"
+            reply += f"\n--{diffs_info_str}"
+            reply += f"\n---SID：{song_id}\n"
+
+        return mh.compose_txt_msg(reply)
+
+    # The user's Maimai Single Grade View.
+    def view_single_grade(self, args):
+        func_data = args[0]
+        usr_id = args[1]
+        wb_db = args[-1][0]
+        BOT_GC_INVOKER = args[-1][1]
+
+        # Get Gamertag
+        gamertag  = wb_db.fetch("Users", ["maiID"], "wxid", usr_id)[0][0]
+        if gamertag == '-1':
+            reply = "您未绑定maimai查分器ID。请使用bind指令绑定。\n"
+            reply += f"请注意，请绑定您在{self.DIVING_FISH_WEBSITE}中的用户名。\n"
+            reply += f"示例: {BOT_GC_INVOKER} bind mai xxxxx"
+            return mh.compose_txt_msg(reply)
+
+        # User did not provide SID
+        if len(func_data) == 0:
+            reply = "请提供SID。"
+            return mh.compose_txt_msg(reply)
+
+        target_sid_list = func_data
+        song_info_list = list()
+
+        # Not Numeric
+        for target_sid in target_sid_list:
+            if not target_sid.isnumeric():
+                reply = f"请提供纯数字的SID。"
+                return mh.compose_txt_msg(reply)
+
+            song_info = self._music_by_id(int(target_sid))
+            if len(song_info) == 0:
+                reply = f"WB没有找到SID为{target_sid}的歌曲。"
+                return mh.compose_txt_msg(reply)
+            else:
+                song_info_list += song_info
+
+        usr_record = self._api_query_dev(gamertag, "single", target_sid_list)
+        # User choose to not disclose data
+        if usr_record == -2:
+            reply = "该用户选择不公开数据。"
+            return mh.compose_txt_msg(reply)
+
+        reply = f"Player: {gamertag}"
+
+        for idx, song_info in enumerate(song_info_list):
+            song_id = target_sid_list[idx]
+            song_record = usr_record.get(song_id, list())
+
+            reply += f"\n[{idx+1}] {song_info['title']} <ID{song_id}>"
+
+            for i, const in enumerate(song_info["ds"]):
+                diff_str = self.DIFF_LIST_SHORT[i]
+                achievement = "无数据"
+                dx_score = "无数据"
+                for record in song_record:
+                    if record["level_index"] == i:
+                        achievement = f"{record['achievements']}%"
+                        dx_score = record["dxScore"]
+                reply += f"\n-[{diff_str} {const}] {achievement} (DxS:{dx_score})"
+
+            reply += "\n"
+
+        return mh.compose_txt_msg(reply)
 
 class Mai_B50(object):
     """Maimai B50 Image Drawing"""
