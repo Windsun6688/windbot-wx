@@ -353,24 +353,24 @@ class Handler(object):
             bili_text += f"\nURL: {soup.url.string}"
             output(bili_text, logtype = "GROUPCHAT")
             return
+        else:
+            # XMLs are used in refermsg as well
+            refmsg = soup.refermsg
 
-        # XMLs are used in refermsg as well
-        refmsg = soup.refermsg
-
-        msgJson = {
-            'content':soup.select_one('title').text,
-            'refcontent': refmsg.select_one('content').text,
-            'refnick': refmsg.select_one('displayname').text,
-            'id':msgJson['id'],
-            'id1':msgJson['content']['id2'],
-            'id2': refmsg.select_one('chatusr').text,
-            'id3':'',
-            'srvid':msgJson['srvid'],
-            'time':msgJson['time'],
-            'type':msgJson['type'],
-            'wxid':msgJson['content']['id1']
-        }
-        self.handle_recv_msg(msgJson)
+            msgJson = {
+                'content':soup.select_one('title').text,
+                'refcontent': refmsg.select_one('content').text,
+                'refnick': refmsg.select_one('displayname').text,
+                'id':msgJson['id'],
+                'id1':msgJson['content']['id2'],
+                'id2': refmsg.select_one('chatusr').text,
+                'id3':'',
+                'srvid':msgJson['srvid'],
+                'time':msgJson['time'],
+                'type':msgJson['type'],
+                'wxid':msgJson['content']['id1']
+            }
+            self.handle_recv_msg(msgJson)
 
     # wxapi: handle at message * Doesn't Work As Expected. Archived Here
     def handle_at_msg(self, msgJson) -> None:
@@ -554,7 +554,10 @@ class Handler(object):
                                          self.wb_db,
                                          self.BOT_GC_INVOKER,
                                          self.all_func,
-                                         self.marked_usr_func])
+                                         self.marked_usr_func,
+                                         self.msgr,
+                                         self.usr_func_called_ranking,
+                                         self.SUDO_LIST])
                 ## Provide Access to WB Data for the Maimai Module.
                 elif module == "Maimai":
                     execute_args.append([self.wb_db,\
@@ -589,7 +592,8 @@ class Handler(object):
                                          self.all_func,
                                          self.marked_usr_func,
                                          self.msgr,
-                                         self.usr_func_called_ranking])
+                                         self.usr_func_called_ranking,
+                                         self.SUDO_LIST])
                 ######## WATERPROOF TAPE PATCH ########
 
                 # Managing Functions will be blocking
@@ -608,8 +612,8 @@ class Handler(object):
 
         # Error Happened. Push Error Msg to destination
         except Exception as e:
-            output(f'ERROR ON CALL: {e}','ERROR','HIGHLIGHT','RED')
-            output(traceback.format_exc(),'ERROR','HIGHLIGHT','RED')
+            output(f"ERROR ON CALL: {e}","ERROR","HIGHLIGHT",'RED')
+            output(traceback.format_exc(),"ERROR","HIGHLIGHT","RED")
             ## Compose the Error Message.
             err_msg = f"WB遇到了一些意料外的问题。\n指令： {req_func_keyword}"
             err_msg += f"\n错误细节： {e}"
@@ -620,13 +624,25 @@ class Handler(object):
             return
 
         # No Error Happened. Move on to reply 
-        content = reply_package["content"]
-        if reply_package["type"] == "TEXT":
-            self.msgr.send_txt_msg(content, destination)
-        elif reply_package["type"] == "ATTACH":
-            self.msgr.send_attach(content, destination)
-        elif reply_package["type"] == "PIC":
-            self.msgr.send_pic(content, destination)
+        # Multiple Replies
+        if isinstance(reply_package, list):
+            for reply in reply_package:
+                content = reply["content"]
+                if reply["type"] == "TEXT":
+                    self.msgr.send_txt_msg(content, destination)
+                elif reply["type"] == "ATTACH":
+                    self.msgr.send_attach(content, destination)
+                elif reply["type"] == "PIC":
+                    self.msgr.send_pic(content, destination)
+        # Single Reply
+        else:
+            content = reply_package["content"]
+            if reply_package["type"] == "TEXT":
+                self.msgr.send_txt_msg(content, destination)
+            elif reply_package["type"] == "ATTACH":
+                self.msgr.send_attach(content, destination)
+            elif reply_package["type"] == "PIC":
+                self.msgr.send_pic(content, destination)
         return
 
     # Helper to retrieve the banned status of calling user.

@@ -34,12 +34,14 @@ class Core(object):
         self.META = __module_meta__
         self.USER_FUNCTIONS = {
             "nop": self.no_op,
+            "swym": self.no_op,
             "rand": self.rand_item,
             "listfunc": self.list_functions,
             "bind": self.bind,
             "reperr": self.report_error,
             "mdsts": self.module_status,
             "patstat": self.patstat,
+            "fdbk": self.feedback,
         }
         self.MNGNG_FUNCTIONS = {
             "listmng": self.list_functions_mng,
@@ -84,8 +86,8 @@ class Core(object):
         for module in avail_usr_func:
             reply += f"[{module}]\n"
             for func in avail_usr_func[module]:
-                avail_status = ["[X]", "[O]"]
-                marked_status = ["", "[*]"]
+                avail_status = [" [X]", " [O]"]
+                marked_status = ["", " [*]"]
                 func_status = avail_status[int(avail_usr_func[module][func])]
                 func_mark = marked_status[int(marked_usr_func[module][func])]
                 reply += f" - {func}{func_status}{func_mark}\n"
@@ -436,6 +438,40 @@ class Core(object):
 
         return mh.compose_txt_msg(reply)
 
+    # Feedback an Message to Sudoer
+    def feedback(self, args):
+        func_data = args[0]
+        wb_db = args[-1][2]
+        msgr = args[-1][6]
+        sudo_list = args[-1][8]
 
+        usr_id = args[1]
+        from_id = args[2]
 
+        # User did not provide message 
+        if len(func_data) == 0:
+            reply = "请提供反馈内容。"
+        # User provided message 
+        else:
+            reply = "发送完成"
+            msg = " ".join(func_data)
+            recipient = sudo_list[0]
 
+            # Group Chat
+            if usr_id != from_id:
+                room_num = from_id.replace("@chatroom", "")
+                room_name = wb_db.fetch("Groupchats", ["groupname"],\
+                                        "roomid", room_num)[0][0]
+                usr_nick = wb_db.fetch(f"r{room_num}", ["groupUsrName"],\
+                                        "wxid", usr_id)[0][0]
+                feedback = f"来自{room_name}-{usr_nick}({usr_id})的反馈:\n"
+            # DM
+            else:
+                usr_nick = wb_db.fetch("Users", ["realUsrName"],\
+                                       "wxid", usr_id)[0][0]
+                feedback = f"来自{usr_nick}({usr_id})的DM反馈:\n"
+
+            feedback += msg
+            msgr.send_txt_msg(feedback, recipient)
+
+        return mh.compose_txt_msg(reply)

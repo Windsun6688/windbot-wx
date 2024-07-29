@@ -53,6 +53,7 @@ class Maimai(object):
             "mrand": self.music_random,
             "minfo": self.music_search,
             "mgrade": self.view_single_grade,
+            "mwhat": self.music_alias_search,
         }
         self.MNGNG_FUNCTIONS = {
             "mupdate": self.static_update,
@@ -179,6 +180,7 @@ class Maimai(object):
                 data = -3
             else:
                 data = 0
+
         return data
 
     ######## API Functions ########
@@ -266,12 +268,13 @@ class Maimai(object):
         - music 曲目数据
         - charts 曲目数据
         """
-        params = {}
+        params = None
 
         if func == "alias":
             method = f"/maimaidxalias"
         elif func == "id2alias":
             method = f"/getsongsalias"
+            params = dict()
             params["id"] = music_id
         elif func == "aliastatus":
             method = f"/getaliasstatus"
@@ -285,8 +288,10 @@ class Maimai(object):
             return 0
 
         url = self.MAI_ALIAS_API + method
-
-        return self._request("GET", url, params = params)
+        if params != None:
+            return self._request("GET", url, params = params)
+        else:
+            return self._request("GET", url)
 
     ######## Resources Update & Local Data Retrieval ########
     # Retrieves Song Data / Overwrite(Update) Song Data
@@ -353,7 +358,7 @@ class Maimai(object):
         if not local:
             alias_data = self._alias_api_data_get("alias")
 
-            if isinstance(alias_data, dict):
+            if isinstance(alias_data, list):
                 with open(os.path.join(self.STATIC_PATH, "music_alias.json"), 'w',\
                         encoding='utf-8') as f:
                     f.write(json.dumps(alias_data, ensure_ascii=False, indent=4))
@@ -759,6 +764,37 @@ class Maimai(object):
 
             reply += "\n"
 
+        return mh.compose_txt_msg(reply)
+
+    # The user's Maimai Alias Search.
+    def music_alias_search(self, args):
+        alias_data = self._alias_get(local = True)[0]
+        func_data = args[0]
+
+        results = list()
+        # User didn't provide input
+        if len(func_data) == 0:
+            reply = "请提供WB用于搜索的别名。"
+            return mh.compose_txt_msg(reply)
+        
+        # Search for alias
+        keyword = " ".join(func_data)
+        for song in alias_data:
+            if keyword in song["Alias"]:
+                song_info = self._music_by_id(song["SongID"])
+                results += song_info
+        
+        if len(results) == 0:
+            reply = f"WB没有找到结果。您查找了：{keyword}"
+        elif len(results) > 10:
+            reply = f"WB找到了太多结果({len(results)}个！)"
+            reply += "\n请尝试搜索其他别名。"
+        else:
+            reply = f"这个别名可能指向以下{len(results)}首歌："
+            for idx, song_info in enumerate(results):
+                title = song_info["title"]
+                song_id = song_info["id"]
+                reply += f"\n[{idx+1}] {title} (ID{song_id})"
         return mh.compose_txt_msg(reply)
 
 class Mai_B50(object):
