@@ -202,9 +202,11 @@ class Handler(object):
     # Initialize static variables
     def _init_static(self) -> None:
         self.pat_invoker = "拍了拍我"
-        self.wb_invite_invokers = ("邀请你","加入群聊")
-        self.invite_invokers = ("邀请", "加入群聊")
+        self.wb_invite_invokers = "邀请你加入了群聊"
+        self.invite_invokers = ("邀请", "加入了群聊")
         self.wb_invite_msg = "感谢您选择WindBot！"
+        self.wb_invite_msg += "\n请使用listfunc命令来查看所有功能。"
+        self.wb_invite_repo = "WB进入了新群聊： "
         self.wb_greeting_msg = "欢迎进群"
         self.wb_summon_msg = ("您好!","我可以帮到您些什么?")
         self.wb_empty_call_msg = "请指明需要使用的功能。"
@@ -255,6 +257,7 @@ class Handler(object):
     # wxapi: handle status message
     def handle_status_msg(self, msgJson) -> None:
         vis_content = msgJson["content"]["content"]
+        from_id = msgJson["content"]["id1"]
 
         # User Pats WindBot
         if self.pat_invoker in vis_content:
@@ -262,20 +265,20 @@ class Handler(object):
             self.handle_pat_wb(msgJson)
 
         # WindBot is Invited into a new Groupchat
-        elif all(i in vis_content for i in self.wb_invite_invokers):
+        elif self.wb_invite_invokers in vis_content:
             output(vis_content)
             output("WindBot is being invited to a new group. Refreshing...")
             self.msgr.get_wxuser_list()
 
-            roomid = msgJson['content']['id1']
-            self.msgr.send_txt_msg(self.wb_invite_msg, wxid = roomid)
+            self.msgr.send_txt_msg(self.wb_invite_msg, wxid = from_id)
+            self.msgr.send_txt_msg(self.wb_invite_repo + from_id,\
+                                   wxid = self.SUDO_LIST[0])
 
         # New User Join Groupchat 
         elif all(i in vis_content for i in self.invite_invokers):
-            roomid = msgJson['content']['id1']
-            output(f"New User Joined {roomid}. Refreshing...")
+            output(f"New User Joined {from_id}. Refreshing...")
             self.msgr.get_wxuser_list()
-            self.msgr.send_txt_msg(self.wb_greeting_msg, wxid = roomid)
+            self.msgr.send_txt_msg(self.wb_greeting_msg, wxid = from_id)
 
     # Helper of handle_status_msg. Handles pats
     def handle_pat_wb(self, msgJson):

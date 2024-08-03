@@ -469,7 +469,7 @@ class Maimai(object):
                      font=_tb, fill =(0,0,0,255), anchor = 'lm')
 
         # Write Split Rating
-        total_ra = ra + add_ra
+        total_ra = ra
         total_ra = f"{total_ra:05d}"
         text_im.text((847, 300), f"STAYIN' IN THE FESTiVAL",\
                      font=_siyuan, fill= (0,0,0,255), anchor = 'mm')

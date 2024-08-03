@@ -52,7 +52,8 @@ class Core(object):
             "announce": self.announce,
             "annswitch": self.announce_switch,
             "annview": self.announce_list,
-            "funccnt": self.func_called_rank,
+            "funcrank": self.func_called_rank,
+            "refresh": self.refresh,
         }
         self.STATIC_PATH = mh.compose_static_path("core")
 
@@ -473,5 +474,14 @@ class Core(object):
 
             feedback += msg
             msgr.send_txt_msg(feedback, recipient)
+
+        return mh.compose_txt_msg(reply)
+
+    # Manually Refresh the Windbot DB.
+    def refresh(self, args):
+        reply = "已刷新。"
+        msgr = args[-1][6]
+
+        msgr.get_wxuser_list()
 
         return mh.compose_txt_msg(reply)
