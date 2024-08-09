@@ -1,10 +1,6 @@
 # WindBot Main Core (Bridge)
 # May 2024
 
-# Local Imports
-from wb_msgr_wx import Messenger
-from wb_sql_wx import SQLHelper
-
 # Standard Lib Imports
 import os
 import json
@@ -20,6 +16,11 @@ import traceback
 import rel
 from colorama import init
 from bs4 import BeautifulSoup
+
+
+# Local Imports
+from wb_msgr_wx import Messenger
+from wb_sql_wx import SQLHelper
 
 class Core(object):
     """Windbot Core Bridging Between Modules and wxapi Messenger"""
@@ -299,12 +300,11 @@ class Handler(object):
                 # Update the User DB
                 self.msgr.get_wxuser_list()
                 return
-            else:
-                usr_id = wxid_query[0][0]
-        # Pat Comes from DM 
+            usr_id = wxid_query[0][0]
+        # Pat Comes from DM
         else:
             usr_id = from_id
-        
+
         # Increment Recorded patTimes by 1
         rec_pat_times = self.wb_db.fetch("Users",['patTimes'],\
                                 "wxid", usr_id)[0][0]
@@ -402,7 +402,7 @@ class Handler(object):
         #     # Terminal Log
         #     output(f'{nickname}: [IMAGE]','DM')
 
-    #################### USER CALL RELATED FUNCTIONS BELOW ################## 
+    #################### USER CALL RELATED FUNCTIONS BELOW ##################
     # wxapi: handle text message
     def handle_recv_msg(self, msgJson) -> None:
         self.undisturbed_hb = 0

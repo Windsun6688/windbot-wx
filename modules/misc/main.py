@@ -5,19 +5,20 @@ Author: Windsun
 Jul 29 2024
 """
 
-# Module Helper Imports
-from ..moduleHelper import ModuleHelper, ModuleMetadata
-
-# Local Imports
-from .gosenchoyen.generator import genImage
 
 # Standard Lib Imports
 import random
 import os
+from datetime import datetime
 
 # Third Party Imports
 from pytz import timezone
-from datetime import datetime
+
+# Local Imports
+from .gosenchoyen.generator import genImage
+
+# Module Helper Imports
+from ..moduleHelper import ModuleHelper, ModuleMetadata
 
 mh = ModuleHelper()
 
@@ -66,7 +67,7 @@ class Misc(object):
         else:
             keyword = None
 
-        # Lowres 
+        # Lowres
         if keyword == "l":
             parrot_path = self.PARROT_PATH
         # HD
@@ -109,7 +110,7 @@ class Misc(object):
     def gen_gosen(self, args):
         func_data = args[0]
 
-        # User did not provide input, default message 
+        # User did not provide input, default message
         if len(func_data) == 0:
             first_keyword = "5000兆円"
             second_keyword = "欲しい!"
@@ -127,4 +128,3 @@ class Misc(object):
                  word_b = second_keyword).save(self.GOSEN_PIC)
 
         return mh.compose_attach_msg(self.GOSEN_PIC)
-

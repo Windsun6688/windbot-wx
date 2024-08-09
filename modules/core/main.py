@@ -333,8 +333,8 @@ class Core(object):
             reply += f" ]  {round(100-disabled_per)}%\n"
 
         return mh.compose_txt_msg(reply)
-    
-    # Retrieves patTimes data for user   
+
+    # Retrieves patTimes data for user
     def patstat(self, args):
         wb_db = args[-1][2]
         usr_id = args[1]

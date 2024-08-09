@@ -161,7 +161,7 @@ class SQLHelper(object):
     def _usr_table_init(self) -> None:
         conn = self.connect()
 
-        init_usr_cmd = f'''CREATE TABLE IF NOT EXISTS Users
+        init_usr_cmd = '''CREATE TABLE IF NOT EXISTS Users
                 (wxid TEXT,
                 wxcode TEXT,
                 realUsrName TEXT,
@@ -181,7 +181,7 @@ class SQLHelper(object):
     def _group_overview_table_init(self) -> None:
         conn = self.connect()
 
-        init_gc_overview_cmd = f'''CREATE TABLE IF NOT EXISTS Groupchats
+        init_gc_overview_cmd = '''CREATE TABLE IF NOT EXISTS Groupchats
                 (roomid TEXT,
                 groupname TEXT,
                 announce BOOL NOT NULL DEFAULT 0,
@@ -189,7 +189,7 @@ class SQLHelper(object):
         conn.execute(init_gc_overview_cmd)
         conn.commit()
         conn.close()
-        
+
     # WB DB Structure: Initialize a Groupchat Data Table.
     def _gc_table_init(self, roomid) -> None:
         conn = self.connect()
@@ -201,4 +201,3 @@ class SQLHelper(object):
         conn.execute(init_gc_cmd)
         conn.commit()
         conn.close()
-

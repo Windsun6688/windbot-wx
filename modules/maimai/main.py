@@ -1,4 +1,3 @@
-
 """
 [M A I M A I]
 WindBot MaimaiDX Module
@@ -6,8 +5,6 @@ Author: Windsun
 Jul 25 2024
 """
 
-# Module Helper Imports
-from ..moduleHelper import ModuleHelper, ModuleMetadata
 
 # Standard Lib Imports
 import json
@@ -22,6 +19,9 @@ import requests
 from rapidfuzz import fuzz
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
+
+# Module Helper Imports
+from ..moduleHelper import ModuleHelper, ModuleMetadata
 
 mh = ModuleHelper()
 
@@ -336,7 +336,7 @@ class Maimai(object):
                         encoding='utf-8') as f:
                     f.write(json.dumps(chart_stats, ensure_ascii=False, indent=4))
             else:
-                output('maimaiDX谱面数据获取失败,切换至本地暂存文件',\
+                mh.output('maimaiDX谱面数据获取失败,切换至本地暂存文件',\
                         'WARNING',background = 'WHITE')
                 local = True
                 success = False
@@ -1053,10 +1053,10 @@ class Mai_B50(object):
         for song_record in data:
             # 每首歌间距/5首歌换行
             if num % 5 == 0:
-                    x = 70
-                    y += dy if num != 0 else 0
+                x = 70
+                y += dy if num != 0 else 0
             else:
-                    x += 416
+                x += 416
 
             # 结构: [title,level,diff,song_id,chart_const,chart_type,acc,racc,star,rate,rating,fc,fs]
 
@@ -1089,16 +1089,16 @@ class Mai_B50(object):
             # if FC, Draw Full Combo Pic
             fc_status = song_record["fc"]
             if fc_status:
-               fc = Image.open(os.path.join(self.PIC_PATH,\
+                fc = Image.open(os.path.join(self.PIC_PATH,\
                                     f"UI_MSS_MBase_Icon_{fc_status}.png")).resize((45, 45))
-               output.alpha_composite(fc, (x + 246, y + 99))
+                output.alpha_composite(fc, (x + 246, y + 99))
 
             # if FS, Draw Full Sync Pic
             fs_status = song_record["fs"]
             if fs_status:
-               fs = Image.open(os.path.join(self.PIC_PATH,\
+                fs = Image.open(os.path.join(self.PIC_PATH,\
                                     f'UI_MSS_MBase_Icon_{fs_status}.png')).resize((45, 45))
-               output.alpha_composite(fs, (x + 291, y + 99))
+                output.alpha_composite(fs, (x + 291, y + 99))
 
             # Draw DX Star
             dx_score = song_record["dxScore"]

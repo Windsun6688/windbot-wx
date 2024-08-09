@@ -5,9 +5,6 @@ Author: Windsun
 Feb 10 2024
 """
 
-# Module Helper Imports
-from ..moduleHelper import ModuleHelper, ModuleMetadata
-
 # Standard Lib Imports
 import json
 import os
@@ -19,6 +16,8 @@ import random
 import requests
 from rapidfuzz import fuzz
 
+# Module Helper Imports
+from ..moduleHelper import ModuleHelper, ModuleMetadata
 mh = ModuleHelper()
 
 __module_meta__ = ModuleMetadata(
@@ -92,7 +91,7 @@ class Arcaea(object):
 
         api_page_url = self.ARC_WIKI_API + pages[item]
 
-        resp = requests.get(api_page_url)
+        resp = requests.get(api_page_url, timeout = 500)
 
         if resp.status_code == 200:
             data = resp.json()
@@ -122,7 +121,7 @@ class Arcaea(object):
                     f.write(song_dict)
                     f.close()
             else:
-                output('Arcaea曲目数据获取失败,切换至本地暂存文件',\
+                mh.output('Arcaea曲目数据获取失败,切换至本地暂存文件',\
                         'WARNING',background = 'WHITE')
                 local = True
                 success = False
@@ -152,7 +151,7 @@ class Arcaea(object):
                     f.write(const_dict)
                     f.close()
             else:
-                output('Arcaea谱面定数数据获取失败,切换至本地暂存文件',\
+                mh.output('Arcaea谱面定数数据获取失败,切换至本地暂存文件',\
                         'WARNING',background = 'WHITE')
                 local = True
                 success = False
@@ -181,7 +180,7 @@ class Arcaea(object):
                     f.write(complex_artist_data)
                     f.close()
             else:
-                output('Arcaea复合曲师数据获取失败,切换至本地暂存文件',\
+                mh.output('Arcaea复合曲师数据获取失败,切换至本地暂存文件',\
                         'WARNING',background = 'WHITE')
                 local = True
                 success = False
@@ -210,7 +209,7 @@ class Arcaea(object):
                     f.write(song_len_data)
                     f.close()
             else:
-                output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
+                mh.output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
                         'WARNING',background = 'WHITE')
                 local = True
                 success = False
@@ -239,7 +238,7 @@ class Arcaea(object):
                     f.write(version_time_data)
                     f.close()
             else:
-                output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
+                mh.output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
                         'WARNING',background = 'WHITE')
                 local = True
                 success = False
@@ -268,7 +267,7 @@ class Arcaea(object):
                     f.write(pack_data)
                     f.close()
             else:
-                output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
+                mh.output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
                         'WARNING',background = 'WHITE')
                 local = True
                 success = False
@@ -297,7 +296,7 @@ class Arcaea(object):
                     f.write(unlock_data)
                     f.close()
             else:
-                output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
+                mh.output('Arcaea曲目长度数据获取失败,切换至本地暂存文件',\
                         'WARNING',background = 'WHITE')
                 local = True
                 success = False
@@ -505,8 +504,8 @@ class Arcaea(object):
             if title_ja != None:
                 title += f"({title_ja})"
 
-            format = random.choice(reply_format)
-            reply = format.replace("songname", title)
+            template = random.choice(reply_format)
+            reply = template.replace("songname", title)
             reply = reply.replace("artist", artist)
 
         return mh.compose_txt_msg(reply)
@@ -923,4 +922,3 @@ class Arcaea(object):
                 reply += f"\n[{i+1}] {artist} - {title} <SIDX{song_idx}>"
 
         return mh.compose_txt_msg(reply)
-

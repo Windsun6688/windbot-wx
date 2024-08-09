@@ -3,10 +3,10 @@
 
 # Standard Lib Imports
 import json
+import time
 
 # Third Party Imports
 import websocket
-import time
 
 # Initialize WebSocket Settings
 websocket._logging._logger.level = -99
@@ -58,7 +58,7 @@ class Messenger(object):
             'content':'none',
             'wxid':'node',
         }
-        self.ws.send(json.dumps(ws_data))
+        self.ws.send(json.dumps(qs))
 
     # Tells websocket wxapi to send a text message.
     def send_txt_msg(self, msg:str, wxid:str = 'null') -> None:
@@ -147,7 +147,6 @@ class Messenger(object):
         ws_data = {
             'id': self.getid(),
             'type': self.PERSONAL_INFO,
-            'content': 'null',
             'wxid': wxid,
             'roomid': 'null',
             'content': 'null',
@@ -213,15 +212,3 @@ def output(msg, logtype='SYSTEM', mode='DEFAULT', background='DEFAULT'):
         msg += '\n......'
 
     print(f"[{now} \033[{mode};{color}{bg}m{logtype}\033[0m] {msg}")
-
-    # Write Error Logs on to Local File
-    # if logtype == 'ERROR':
-    #     error_log_file = open('ErrorLog.txt','a')
-    #     error_log_file.write(f"[{now} {logtype}] {msg}\n")
-    #     error_log_file.close()
-
-    # Store Log into latest_logs list
-    # if logtype != 'HEART_BEAT':
-    #     if len(latest_logs) == 20:
-    #         latest_logs.pop(0)
-    #     latest_logs.append(f"[{now} {logtype}] {msg}")
