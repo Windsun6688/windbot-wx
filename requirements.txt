@@ -5,3 +5,7 @@ pytz
 opencv-python-headless
 html2text
 xmltodict
+rel
+colorama
+beautifulsoup4
+websocket
