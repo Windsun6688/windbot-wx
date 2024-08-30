@@ -1,5 +1,8 @@
 import unittest
-from ..game_logic import LetterState, check_guess
+from ..game_logic import LetterState, check_guess, WordlistManager
+from ... import moduleHelper
+
+mh = moduleHelper.ModuleHelper()
 
 
 class CheckGuessTestCase(unittest.TestCase):
@@ -94,6 +97,30 @@ class CheckGuessTestCase(unittest.TestCase):
             LetterState.INCORRECT,
         ]
         self.assertEqual(check_guess(guess, answer), expected)
+
+
+class CheckWordlistTestCase(unittest.TestCase):
+    def setUp(self):
+        wordlist_filepath = mh.compose_static_path("wordle/common_words_ge_5.txt")
+        self.allowed_words_path = wordlist_filepath
+        self.possible_words_path = wordlist_filepath
+        self.wordlist_manager = WordlistManager(
+            self.allowed_words_path, self.allowed_words_path
+        )
+
+    def test_words_are_uppercase_alphabetical(self):
+        for word in self.wordlist_manager.allowed_words:
+            self.assertTrue(word.isalpha())
+            self.assertTrue(word.isupper())
+        for wordlist in self.wordlist_manager.possible_words.values():
+            for word in wordlist:
+                self.assertTrue(word.isalpha())
+                self.assertTrue(word.isupper())
+
+    def test_possible_words_are_always_allowed(self):
+        for wordlist in self.wordlist_manager.possible_words.values():
+            for word in wordlist:
+                self.assertIn(word, self.wordlist_manager.allowed_words)
 
 
 if __name__ == "__main__":
