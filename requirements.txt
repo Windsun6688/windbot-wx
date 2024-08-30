@@ -1,0 +1,7 @@
+requests
+rapidfuzz
+pillow
+pytz
+opencv-python-headless
+html2text
+xmltodict
