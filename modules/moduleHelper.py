@@ -6,8 +6,10 @@ import sqlite3
 import time
 import json
 
+
 class ModuleHelper:
     """Provide Helpers For Modules to interact with the Main program."""
+
     main_path: str
     static_root: str
     type_dict: dict
@@ -16,17 +18,17 @@ class ModuleHelper:
         self.main_path = os.getcwd()
         self.static_root = os.path.join(self.main_path, "static")
         self.type_dict = {
-            "TXT_MSG" : 555,
-            "PIC_MSG" : 500,
-            "AT_MSG" : 550,
-            "CHATROOM_MEMBER" : 5010,
-            "CHATROOM_MEMBER_NICK" : 5020,
-            "PERSONAL_INFO" : 6500,
-            "DEBUG_SWITCH" : 6000,
-            "PERSONAL_DETAIL" : 6550,
-            "DESTROY_ALL" : 9999,
-            "STATUS_MSG" : 10000,
-            "ATTACH_FILE" : 5003,
+            "TXT_MSG": 555,
+            "PIC_MSG": 500,
+            "AT_MSG": 550,
+            "CHATROOM_MEMBER": 5010,
+            "CHATROOM_MEMBER_NICK": 5020,
+            "PERSONAL_INFO": 6500,
+            "DEBUG_SWITCH": 6000,
+            "PERSONAL_DETAIL": 6550,
+            "DESTROY_ALL": 9999,
+            "STATUS_MSG": 10000,
+            "ATTACH_FILE": 5003,
         }
 
     def get_main_root(self) -> str:
@@ -45,66 +47,62 @@ class ModuleHelper:
 
     def compose_txt_msg(self, msg) -> dict:
         msg_content = {
-            'id': self.getid(),
-            'type': "TEXT",
-            'content': msg,
+            "id": self.getid(),
+            "type": "TEXT",
+            "content": msg,
         }
         return msg_content
 
     def compose_img_msg(self, filepath) -> dict:
         msg_content = {
-            'id':self.getid(),
-            'type': "PIC",
-            'content': filepath,
+            "id": self.getid(),
+            "type": "PIC",
+            "content": filepath,
         }
         return msg_content
 
     def compose_attach_msg(self, filepath) -> dict:
         msg_content = {
-            'id':self.getid(),
-            'type': "ATTACH",
-            'content': filepath,
+            "id": self.getid(),
+            "type": "ATTACH",
+            "content": filepath,
         }
         return msg_content
 
     def connect_db(self, db_path) -> sqlite3.Connection:
-        """ Creates a Sqlite3 DB Connection for thread use """
+        """Creates a Sqlite3 DB Connection for thread use"""
         return sqlite3.connect(db_path)
 
     def load_json(self, json_path) -> dict:
-        with open(json_path, "r", encoding = "utf-8") as f:
+        with open(json_path, "r", encoding="utf-8") as f:
             return json.loads(f.read())
 
     # Custom Print Wrapper
-    def output(self, msg, logtype='SYSTEM', mode='DEFAULT', background='DEFAULT'):
+    def output(self, msg, logtype="SYSTEM", mode="DEFAULT", background="DEFAULT"):
         LogColor = {
-            'SYSTEM': '034',
-            'ERROR': '037',
-            'GROUPCHAT': '036',
-            'DM' : '033',
-            'HEART_BEAT': '035',
-            'PAT': '037',
-            'SEND': '032',
-            'CALL' : '031',
-            'WARNING': '031',
-            'CREATE_LINK':'032',
-            'STOP_LINK':'031',
-            'RSS': '037'
+            "SYSTEM": "034",
+            "ERROR": "037",
+            "GROUPCHAT": "036",
+            "DM": "033",
+            "HEART_BEAT": "035",
+            "PAT": "037",
+            "SEND": "032",
+            "CALL": "031",
+            "WARNING": "031",
+            "CREATE_LINK": "032",
+            "STOP_LINK": "031",
+            "RSS": "037",
         }
-        LogMode = {
-            'DEFAULT': '0',
-            'HIGHLIGHT': '1',
-            'UNDERLINE': '4'
-        }
+        LogMode = {"DEFAULT": "0", "HIGHLIGHT": "1", "UNDERLINE": "4"}
         LogBG = {
-            'DEFAULT': '',
-            'RED' : ';41',
-            'YELLOW' : ';43',
-            'BLUE' : ';44',
-            'WHITE' : ';47',
-            'GREEN' : ';42',
-            'MINT' : ';46',
-            'PURPLE' : ';45'
+            "DEFAULT": "",
+            "RED": ";41",
+            "YELLOW": ";43",
+            "BLUE": ";44",
+            "WHITE": ";47",
+            "GREEN": ";42",
+            "MINT": ";46",
+            "PURPLE": ";45",
         }
         color = LogColor.get(logtype)
         mode = LogMode.get(mode)
@@ -113,10 +111,10 @@ class ModuleHelper:
         now = time.strftime("%Y-%m-%d %X")
 
         # Shorten logs of too long messages
-        line_cnt = msg.count('\n') + 1
-        if line_cnt > 10 and logtype != 'ERROR':
+        line_cnt = msg.count("\n") + 1
+        if line_cnt > 10 and logtype != "ERROR":
             msg = "\n".join(msg.split("\n")[:10])
-            msg += '\n......'
+            msg += "\n......"
 
         print(f"[{now} \033[{mode};{color}{bg}m{logtype}\033[0m] {msg}")
 
@@ -132,8 +130,10 @@ class ModuleHelper:
         #         latest_logs.pop(0)
         #     latest_logs.append(f"[{now} {logtype}] {msg}")
 
+
 class ModuleMetadata(object):
     """Standard Structure for the Metadata of a Module"""
+
     name: str
     desc: str
     extra: dict
@@ -157,4 +157,4 @@ class ModuleMetadata(object):
         return self.extra["moduleid"]
 
     def get_version(self) -> str:
-        return self.extra['version']
+        return self.extra["version"]

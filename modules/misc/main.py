@@ -5,7 +5,6 @@ Author: Windsun
 Jul 29 2024
 """
 
-
 # Standard Lib Imports
 import random
 import os
@@ -23,14 +22,15 @@ from ..moduleHelper import ModuleHelper, ModuleMetadata
 mh = ModuleHelper()
 
 __module_meta__ = ModuleMetadata(
-    name =  "Misc",
-    desc =  "Windbot Misc & Meme Module",
-    extra = {
+    name="Misc",
+    desc="Windbot Misc & Meme Module",
+    extra={
         "moduleuid": "misc",
         "version": "0.0.1",
         "author": ["Windsun"],
-    }
+    },
 )
+
 
 class Misc(object):
     # Module Properties
@@ -46,8 +46,7 @@ class Misc(object):
             "gosen": self.gen_gosen,
             "friday": self.friday_in_cali,
         }
-        self.MNGNG_FUNCTIONS = {
-        }
+        self.MNGNG_FUNCTIONS = {}
         self.STATIC_PATH = mh.compose_static_path("misc")
         self._init_static()
 
@@ -77,7 +76,7 @@ class Misc(object):
         else:
             reply = f"没有该参数：{keyword}"
             return mh.compose_txt_msg(reply)
-        
+
         # Choose a Parrot
         chosen_parrot = random.choice(os.listdir(parrot_path))
         # If the folder "hd" is randomly chosen
@@ -88,24 +87,22 @@ class Misc(object):
 
         reply = f"你的鹦鹉是：\n{chosen_parrot.replace('.gif', '')}"
 
-        return [mh.compose_attach_msg(chosen_parrot_path),\
-                mh.compose_txt_msg(reply)]
+        return [mh.compose_attach_msg(chosen_parrot_path), mh.compose_txt_msg(reply)]
 
     # Check if Today is Friday in California
     def friday_in_cali(self, args):
-        cali_tz = timezone('America/Los_Angeles')
+        cali_tz = timezone("America/Los_Angeles")
 
         # If Today is Friday in California
         if int(datetime.now(cali_tz).strftime("%w")) == 5:
             reply = "Today is Friday in California.\nSHOOT!"
-            return [mh.compose_attach_msg(self.FRIDAY_VID),\
-                    mh.compose_txt_msg(reply)]
+            return [mh.compose_attach_msg(self.FRIDAY_VID), mh.compose_txt_msg(reply)]
 
         # If today is not Friday in California
         else:
             reply = "Today is not Friday in California."
             return mh.compose_txt_msg(reply)
-    
+
     # Generate GosenchoyenHoshiii Picture
     def gen_gosen(self, args):
         func_data = args[0]
@@ -124,7 +121,6 @@ class Misc(object):
             second_keyword = func_data[1]
 
         # Generate Gosen Image
-        genImage(word_a = first_keyword,\
-                 word_b = second_keyword).save(self.GOSEN_PIC)
+        genImage(word_a=first_keyword, word_b=second_keyword).save(self.GOSEN_PIC)
 
         return mh.compose_attach_msg(self.GOSEN_PIC)

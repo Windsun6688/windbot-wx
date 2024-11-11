@@ -13,14 +13,15 @@ from ..moduleHelper import ModuleHelper, ModuleMetadata
 mh = ModuleHelper()
 
 __module_meta__ = ModuleMetadata(
-    name =  "Core",
-    desc =  "Windbot Basic Functions",
-    extra = {
+    name="Core",
+    desc="Windbot Basic Functions",
+    extra={
         "moduleuid": "core",
         "version": "0.0.1",
         "author": ["Windsun"],
-    }
+    },
 )
+
 
 class Core(object):
     # Module Properties
@@ -116,18 +117,18 @@ class Core(object):
         wb_db = args[-1][2]
         all_func = args[-1][4]
         func_data = args[0]
-        usr_id = args[1] 
+        usr_id = args[1]
 
         if len(func_data) == 0:
             reply = "请指明需要绑定的项目类型和内容。"
             return mh.compose_txt_msg(reply)
 
         bind_categories = {
-            'arc': 'arcID',
+            "arc": "arcID",
             # 'qq': 'qqID', # For Now, QQID Serves no purpose.
-            'pjsk': 'pjskID',
-            'mai': 'maiID',
-            'pat': 'patAction'
+            "pjsk": "pjskID",
+            "mai": "maiID",
+            "pat": "patAction",
         }
 
         reply = ""
@@ -179,22 +180,22 @@ class Core(object):
     def bind_view(self, args):
         wb_db = args[-1][2]
         BOT_GC_INVOKER = args[-1][3]
-        usr_id = args[1] 
+        usr_id = args[1]
 
-        usr_info = wb_db.fetch("Users",\
-                               ["arcID", "maiID", "pjskID", "patAction"],\
-                               "wxid", usr_id)[0]
-        id_type = ["Arcaea","maimai查分器","pjsk","PatAction指令"]
+        usr_info = wb_db.fetch(
+            "Users", ["arcID", "maiID", "pjskID", "patAction"], "wxid", usr_id
+        )[0]
+        id_type = ["Arcaea", "maimai查分器", "pjsk", "PatAction指令"]
         reply = ""
 
         unbound_cnt = 0
         # Game IDs
-        for i in range(len(usr_info)-1):
+        for i in range(len(usr_info) - 1):
             if str(usr_info[i]) != "-1":
-                reply += f'已绑定的{id_type[i]}ID： {usr_info[i]}\n'
+                reply += f"已绑定的{id_type[i]}ID： {usr_info[i]}\n"
             else:
                 unbound_cnt += 1
-                reply += f'您没有绑定{id_type[i]}ID\n'
+                reply += f"您没有绑定{id_type[i]}ID\n"
 
         # PatAction
         if usr_info[-1] == "-1":
@@ -274,7 +275,7 @@ class Core(object):
                 reply = "已标记。"
 
         return mh.compose_txt_msg(reply)
-    
+
     # Unmark a function.
     def unmark(self, args):
         marked_usr_func = args[-1][5]
@@ -299,8 +300,8 @@ class Core(object):
                 reply = "已清除标记。"
 
         return mh.compose_txt_msg(reply)
-    
-    # Provide a module health overview. 
+
+    # Provide a module health overview.
     def module_status(self, args):
         avail_usr_func = args[-1][0]
         marked_usr_func = args[-1][5]
@@ -319,9 +320,9 @@ class Core(object):
                 if marked_usr_func[module][func] == True:
                     func_marked_cnt += 1
 
-            disabled_per = (func_disabled_cnt / mod_func_cnt * 100)
-            disabled_per_20 = round(disabled_per / 20.0) 
-            marked = " [Marked]" if func_marked_cnt > 1 else "" 
+            disabled_per = func_disabled_cnt / mod_func_cnt * 100
+            disabled_per_20 = round(disabled_per / 20.0)
+            marked = " [Marked]" if func_marked_cnt > 1 else ""
 
             reply += f"[{module}]{marked}"
             reply += f" {mod_func_cnt}T | {func_disabled_cnt}D | {func_marked_cnt}M\n"
@@ -345,7 +346,7 @@ class Core(object):
             reply = f"你总共拍了WB{pat_times}次。\n0MG"
         else:
             reaction = {
-                0: '(*´-`)',
+                0: "(*´-`)",
                 1: "(( _ _ ))..zzzZZ",
                 2: "٩( 'ω' )و",
                 3: "٩( ᐛ )و",
@@ -355,7 +356,7 @@ class Core(object):
                 7: "（＾Ｏ＾☆♪",
                 8: "☆彡",
                 9: "(=´∀｀)人(´∀｀=)",
-                10: "♪───Ｏ（≧∇≦）Ｏ────♪"
+                10: "♪───Ｏ（≧∇≦）Ｏ────♪",
             }
 
             react = reaction[pat_times // 10]
@@ -363,7 +364,7 @@ class Core(object):
 
         return mh.compose_txt_msg(reply)
 
-    # Push a message to groups with annouce on. 
+    # Push a message to groups with annouce on.
     def announce(self, args):
         wb_db = args[-1][2]
         msgr = args[-1][6]
@@ -383,7 +384,7 @@ class Core(object):
                 reply += f"{g[1]}({g[0]})\n"
 
         return mh.compose_txt_msg(reply)
-    
+
     # Toggle the announce status for groupchats.
     def announce_switch(self, args):
         wb_db = args[-1][2]
@@ -396,17 +397,17 @@ class Core(object):
         else:
             reply = ""
             for room_num in func_data:
-                announce_status = wb_db.fetch("Groupchats", ["announce"],\
-                                              "roomid", room_num)
+                announce_status = wb_db.fetch(
+                    "Groupchats", ["announce"], "roomid", room_num
+                )
                 if len(announce_status) == 0:
                     reply += f"群组ID{room_num}不存在\n"
                     continue
 
                 new_status = (announce_status[0][0] + 1) % 2
-                wb_db.update("Groupchats", "announce", new_status,\
-                             "roomid", room_num)
-                reply += f'群组{room_num} 公告:{bool(new_status)}\n'
-        
+                wb_db.update("Groupchats", "announce", new_status, "roomid", room_num)
+                reply += f"群组{room_num} 公告:{bool(new_status)}\n"
+
         return mh.compose_txt_msg(reply)
 
     # View the announce status of groupchats.
@@ -415,7 +416,7 @@ class Core(object):
         func_data = args[0]
 
         reply = "群组公告推送情况:\n"
-        announce_status = wb_db.fetch("Groupchats",["*"], 1, 1)
+        announce_status = wb_db.fetch("Groupchats", ["*"], 1, 1)
         for group in announce_status:
             reply += f"{group[1]} ( {group[0]} ): {bool(group[2])}\n"
 
@@ -428,9 +429,9 @@ class Core(object):
 
         current_date = time.strftime("%Y-%m-%d")
         reply = f"从开机至现在({current_date})指令调用数量:"
-        for keyword in sorted(func_called_times,\
-                              key = func_called_times.get,\
-                              reverse = True):
+        for keyword in sorted(
+            func_called_times, key=func_called_times.get, reverse=True
+        ):
             called_cnt = func_called_times[keyword]
             if called_cnt <= end_valve:
                 break
@@ -449,10 +450,10 @@ class Core(object):
         usr_id = args[1]
         from_id = args[2]
 
-        # User did not provide message 
+        # User did not provide message
         if len(func_data) == 0:
             reply = "请提供反馈内容。"
-        # User provided message 
+        # User provided message
         else:
             reply = "发送完成"
             msg = " ".join(func_data)
@@ -461,15 +462,16 @@ class Core(object):
             # Group Chat
             if usr_id != from_id:
                 room_num = from_id.replace("@chatroom", "")
-                room_name = wb_db.fetch("Groupchats", ["groupname"],\
-                                        "roomid", room_num)[0][0]
-                usr_nick = wb_db.fetch(f"r{room_num}", ["groupUsrName"],\
-                                        "wxid", usr_id)[0][0]
+                room_name = wb_db.fetch(
+                    "Groupchats", ["groupname"], "roomid", room_num
+                )[0][0]
+                usr_nick = wb_db.fetch(
+                    f"r{room_num}", ["groupUsrName"], "wxid", usr_id
+                )[0][0]
                 feedback = f"来自{room_name}-{usr_nick}({usr_id})的反馈:\n"
             # DM
             else:
-                usr_nick = wb_db.fetch("Users", ["realUsrName"],\
-                                       "wxid", usr_id)[0][0]
+                usr_nick = wb_db.fetch("Users", ["realUsrName"], "wxid", usr_id)[0][0]
                 feedback = f"来自{usr_nick}({usr_id})的DM反馈:\n"
 
             feedback += msg

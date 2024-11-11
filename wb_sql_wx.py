@@ -4,14 +4,16 @@
 # Standard Lib Imports
 import sqlite3
 
+
 class SQLHelper(object):
     """SQL Related Functions"""
+
     def __init__(self, db_path):
         self.db_path = db_path
 
     def connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
-    
+
     def cursor(self, connection) -> sqlite3.Cursor:
         return connection.cursor()
 
@@ -32,7 +34,7 @@ class SQLHelper(object):
         conn = self.connect()
         cur = self.cursor(conn)
 
-        # Check Duplicate by id_row & id_value 
+        # Check Duplicate by id_row & id_value
         cur.execute(f"SELECT 1 FROM {table} WHERE {id_row} = ?", [id_value])
         result = cur.fetchone()
 
@@ -51,14 +53,14 @@ class SQLHelper(object):
         cur.close()
         conn.close()
         return True
-    
-    # SQL Update Wrapper. 
+
+    # SQL Update Wrapper.
     def update(self, table, col, val, condi_row, condi_val) -> None:
         # Connect to DB
         conn = self.connect()
         cur = self.cursor(conn)
 
-        # Update Row 
+        # Update Row
         update_cmd = f"UPDATE {table} SET {col} = ? WHERE {condi_row} = ?"
         conn.execute(update_cmd, [val, condi_val])
 
@@ -86,8 +88,8 @@ class SQLHelper(object):
         return [i for i in result]
 
     # SQL Fuzzy Match. *DEPRECIATED*
-    def match(self, table, condition_col, keyword, col = None) -> list:
-        cols = ['*'] if cols == None else cols
+    def match(self, table, condition_col, keyword, col=None) -> list:
+        cols = ["*"] if cols == None else cols
 
         conn = self.connect()
         source = conn
@@ -95,31 +97,35 @@ class SQLHelper(object):
         source.backup(tmp_db)
         tmp_cur = tmp_db.cursor()
 
-        tmp_cur.execute('DROP TABLE IF EXISTS fuzzysearch')
+        tmp_cur.execute("DROP TABLE IF EXISTS fuzzysearch")
 
         fetchcols = cols
         fetchcols.append(condition_col)
-        origin_data = self.fetch(table, fetchcols, cur = tmp_cur)
+        origin_data = self.fetch(table, fetchcols, cur=tmp_cur)
 
-        str_cols = str(cols)[1:-1].replace('\'','')
+        str_cols = str(cols)[1:-1].replace("'", "")
 
-        str_fcols = str(fetchcols)[1:-1].replace('\'','')
+        str_fcols = str(fetchcols)[1:-1].replace("'", "")
 
-        tmp_cur.execute(f'create virtual table fuzzysearch using fts5({str_fcols}, tokenize="porter unicode61");')
+        tmp_cur.execute(
+            f'create virtual table fuzzysearch using fts5({str_fcols}, tokenize="porter unicode61");'
+        )
 
         for row in origin_data:
-            tmp_cur.execute(f'insert into fuzzysearch ({str_fcols}) values ({str(row)[1:-1]});')
+            tmp_cur.execute(
+                f"insert into fuzzysearch ({str_fcols}) values ({str(row)[1:-1]});"
+            )
 
         tmp_db.commit()
 
-        if isinstance(keyword,str):
+        if isinstance(keyword, str):
             match_txt = f"SELECT {str_cols} FROM fuzzysearch WHERE {condition_col} MATCH '{keyword}*'"
         else:
             match_txt = f"SELECT {str_cols} FROM fuzzysearch WHERE {condition_col} MATCH {keyword}*"
 
         result = tmp_cur.execute(match_txt).fetchall()
 
-        tmp_cur.execute('DROP TABLE IF EXISTS fuzzysearch')
+        tmp_cur.execute("DROP TABLE IF EXISTS fuzzysearch")
         tmp_db.commit()
         tmp_db.close()
 
@@ -161,7 +167,7 @@ class SQLHelper(object):
     def _usr_table_init(self) -> None:
         conn = self.connect()
 
-        init_usr_cmd = '''CREATE TABLE IF NOT EXISTS Users
+        init_usr_cmd = """CREATE TABLE IF NOT EXISTS Users
                 (wxid TEXT,
                 wxcode TEXT,
                 realUsrName TEXT,
@@ -172,7 +178,7 @@ class SQLHelper(object):
                 maiID TEXT NOT NULL DEFAULT -1,
                 qqID NUMBER NOT NULL DEFAULT -1,
                 powerLevel NUMBER NULL DEFAULT 0,
-                banned BOOL NOT NULL DEFAULT 0);'''
+                banned BOOL NOT NULL DEFAULT 0);"""
         conn.execute(init_usr_cmd)
         conn.commit()
         conn.close()
@@ -181,11 +187,11 @@ class SQLHelper(object):
     def _group_overview_table_init(self) -> None:
         conn = self.connect()
 
-        init_gc_overview_cmd = '''CREATE TABLE IF NOT EXISTS Groupchats
+        init_gc_overview_cmd = """CREATE TABLE IF NOT EXISTS Groupchats
                 (roomid TEXT,
                 groupname TEXT,
                 announce BOOL NOT NULL DEFAULT 0,
-                rssPush BOOL NOT NULL DEFAULT 1);'''
+                rssPush BOOL NOT NULL DEFAULT 1);"""
         conn.execute(init_gc_overview_cmd)
         conn.commit()
         conn.close()
@@ -194,9 +200,9 @@ class SQLHelper(object):
     def _gc_table_init(self, roomid) -> None:
         conn = self.connect()
 
-        init_gc_cmd = f'''CREATE TABLE IF NOT EXISTS {roomid}
+        init_gc_cmd = f"""CREATE TABLE IF NOT EXISTS {roomid}
                 (wxid TEXT,
-                groupUsrName TEXT);'''
+                groupUsrName TEXT);"""
 
         conn.execute(init_gc_cmd)
         conn.commit()

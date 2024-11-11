@@ -5,7 +5,6 @@ Author: Windsun
 Jul 25 2024
 """
 
-
 # Standard Lib Imports
 import json
 import os
@@ -26,14 +25,15 @@ from ..moduleHelper import ModuleHelper, ModuleMetadata
 mh = ModuleHelper()
 
 __module_meta__ = ModuleMetadata(
-    name =  "Maimai",
-    desc =  "Windbot Maimai Module",
-    extra = {
+    name="Maimai",
+    desc="Windbot Maimai Module",
+    extra={
         "moduleuid": "maimai_cn",
         "version": "0.0.1",
         "author": ["Windsun"],
-    }
+    },
 )
+
 
 class Maimai(object):
     # Module Properties
@@ -62,8 +62,7 @@ class Maimai(object):
 
         self._init_static()
         self._init_dev_token()
-        self.b50_helper = Mai_B50(self._music_get(True)[0],\
-                                  self.MATERIAL_PATH)
+        self.b50_helper = Mai_B50(self._music_get(True)[0], self.MATERIAL_PATH)
 
     # Initialize static data.
     def _init_static(self):
@@ -103,55 +102,59 @@ class Maimai(object):
         }
 
         self.PLATE_2_VER = {
-            '初': 'maimai',
-            '真': 'maimai PLUS',
-            '超': 'maimai GreeN',
-            '檄': 'maimai GreeN PLUS',
-            '橙': 'maimai ORANGE',
-            '暁': 'maimai ORANGE PLUS',
-            '晓': 'maimai ORANGE PLUS',
-            '桃': 'maimai PiNK',
-            '櫻': 'maimai PiNK PLUS',
-            '樱': 'maimai PiNK PLUS',
-            '紫': 'maimai MURASAKi',
-            '菫': 'maimai MURASAKi PLUS',
-            '堇': 'maimai MURASAKi PLUS',
-            '白': 'maimai MiLK',
-            '雪': 'MiLK PLUS',
-            '輝': 'maimai FiNALE',
-            '辉': 'maimai FiNALE',
-            '熊': 'maimai でらっくす',
-            '華': 'maimai でらっくす',
-            '华': 'maimai でらっくす',
+            "初": "maimai",
+            "真": "maimai PLUS",
+            "超": "maimai GreeN",
+            "檄": "maimai GreeN PLUS",
+            "橙": "maimai ORANGE",
+            "暁": "maimai ORANGE PLUS",
+            "晓": "maimai ORANGE PLUS",
+            "桃": "maimai PiNK",
+            "櫻": "maimai PiNK PLUS",
+            "樱": "maimai PiNK PLUS",
+            "紫": "maimai MURASAKi",
+            "菫": "maimai MURASAKi PLUS",
+            "堇": "maimai MURASAKi PLUS",
+            "白": "maimai MiLK",
+            "雪": "MiLK PLUS",
+            "輝": "maimai FiNALE",
+            "辉": "maimai FiNALE",
+            "熊": "maimai でらっくす",
+            "華": "maimai でらっくす",
+            "华": "maimai でらっくす",
             # '華': 'maimai でらっくす PLUS', # Changed in maiCN
             # '华': 'maimai でらっくす PLUS', # Changed in maiCN
-            '爽': 'maimai でらっくす Splash',
-            '煌': 'maimai でらっくす Splash',
+            "爽": "maimai でらっくす Splash",
+            "煌": "maimai でらっくす Splash",
             # '煌': 'maimai でらっくす Splash PLUS', # Changed in maiCN
-            '宙': 'maimai でらっくす UNiVERSE',
-            '星': 'maimai でらっくす UNiVERSE PLUS',
-            '祭': 'maimai でらっくす FESTiVAL',
-            '祝': 'maimai でらっくす FESTiVAL PLUS'
+            "宙": "maimai でらっくす UNiVERSE",
+            "星": "maimai でらっくす UNiVERSE PLUS",
+            "祭": "maimai でらっくす FESTiVAL",
+            "祝": "maimai でらっくす FESTiVAL PLUS",
         }
 
     # Initialize diving-fish dev token.
     def _init_dev_token(self):
         if not os.path.isfile(self.CONFIG_PATH):
             # Generate maimai config file
-            with open(self.CONFIG_PATH, 'w', encoding = 'utf-8') as f:
-                init_config = { "mai_dev_token": ""}
-                f.write(json.dumps(init_config, ensure_ascii = False, indent = 4))
-                mh.output("Did not found config.json. Generated default config.",\
-                    "WARNING", background = "WHITE")
+            with open(self.CONFIG_PATH, "w", encoding="utf-8") as f:
+                init_config = {"mai_dev_token": ""}
+                f.write(json.dumps(init_config, ensure_ascii=False, indent=4))
+                mh.output(
+                    "Did not found config.json. Generated default config.",
+                    "WARNING",
+                    background="WHITE",
+                )
 
         config = json.load(open(self.CONFIG_PATH, "r", encoding="utf-8"))
         self.dev_token = config["mai_dev_token"]
         if self.dev_token == "":
-            mh.output("Continuing Without Developer Token",\
-                    "WARNING", background = "WHITE")
+            mh.output(
+                "Continuing Without Developer Token", "WARNING", background="WHITE"
+            )
 
     # Request wrapper.
-    def _request(self, method:str, url:str, **kwargs):
+    def _request(self, method: str, url: str, **kwargs):
         # Request based on method given
         if method == "GET":
             resp = requests.get(url, **kwargs)
@@ -161,7 +164,7 @@ class Maimai(object):
             return 0
 
         data = None
-        
+
         if self.MAI_DATA_API in url:
             if resp.status_code == 200:
                 data = resp.json()
@@ -173,7 +176,7 @@ class Maimai(object):
                 data = 0
         elif self.MAI_ALIAS_API in url:
             if resp.status_code == 200:
-                data = resp.json()['content']
+                data = resp.json()["content"]
             elif resp.status_code == 400:
                 data = -1
             elif resp.status_code == 500:
@@ -185,7 +188,7 @@ class Maimai(object):
 
     ######## API Functions ########
     # Gets user data from diving-fish API.
-    def _api_query_user(self, gamertag: str, func:str, plates: list = None) -> dict:
+    def _api_query_user(self, gamertag: str, func: str, plates: list = None) -> dict:
         """
         func 获取数据种类有:
         - plate 获取指定代的游玩数据
@@ -207,10 +210,10 @@ class Maimai(object):
 
         url = self.MAI_DATA_API + method
 
-        return self._request("POST", url, json = j)
+        return self._request("POST", url, json=j)
 
     # Gets full/specific user data from diving-fish API.
-    def _api_query_dev(self, gamertag: str, func: str, music_id = None) -> dict:
+    def _api_query_dev(self, gamertag: str, func: str, music_id=None) -> dict:
         """
         func 获取数据种类有:
         - records: 全部数据
@@ -232,23 +235,23 @@ class Maimai(object):
 
         url = self.MAI_DATA_API + method
         if func == "records":
-            return self._request(comm_method, url, headers = headers, params = params)
+            return self._request(comm_method, url, headers=headers, params=params)
         else:
-            return self._request(comm_method, url, headers = headers, json = params)
-    
+            return self._request(comm_method, url, headers=headers, json=params)
+
     # Gets Music data from diving-fish API.
-    def _api_data_get(self, func:str):
+    def _api_data_get(self, func: str):
         """
         func 获取数据种类有:
         - music 获取曲目数据
         - chart 获取单曲数据
         - ranking 获取查分器ranking排行榜
         """
-        if func == 'music':
+        if func == "music":
             method = f"/music_data"
-        elif func == 'chart':
+        elif func == "chart":
             method = f"/chart_stats"
-        elif func == 'ranking':
+        elif func == "ranking":
             method = f"/rating_ranking"
         else:
             return 0
@@ -258,7 +261,7 @@ class Maimai(object):
         return self._request("GET", url)
 
     # Gets data from yuzuchan API.
-    def _alias_api_data_get(self, func:str, music_id:int = None):
+    def _alias_api_data_get(self, func: str, music_id: int = None):
         """
         func 获取数据种类:
         - alias 所有别名
@@ -289,13 +292,13 @@ class Maimai(object):
 
         url = self.MAI_ALIAS_API + method
         if params != None:
-            return self._request("GET", url, params = params)
+            return self._request("GET", url, params=params)
         else:
             return self._request("GET", url)
 
     ######## Resources Update & Local Data Retrieval ########
     # Retrieves Song Data / Overwrite(Update) Song Data
-    def _music_get(self, local: bool) -> Tuple[dict,bool]:
+    def _music_get(self, local: bool) -> Tuple[dict, bool]:
         """
         Not Local: Get Song Data From Diving Fish Server
         Local: Read Song Data From Local File
@@ -304,25 +307,32 @@ class Maimai(object):
         if not local:
             music_data = self._api_data_get("music")
 
-            if isinstance(music_data,list):
-                with open(os.path.join(self.STATIC_PATH, "music_data.json"), 'w', \
-                        encoding='utf-8') as f:
-                    f.write(json.dumps(music_data, ensure_ascii = False, indent = 4))
+            if isinstance(music_data, list):
+                with open(
+                    os.path.join(self.STATIC_PATH, "music_data.json"),
+                    "w",
+                    encoding="utf-8",
+                ) as f:
+                    f.write(json.dumps(music_data, ensure_ascii=False, indent=4))
             else:
-                mh.output('maimaiDX曲目数据获取失败,切换至本地暂存文件',\
-                        'WARNING',background = 'WHITE')
+                mh.output(
+                    "maimaiDX曲目数据获取失败,切换至本地暂存文件",
+                    "WARNING",
+                    background="WHITE",
+                )
                 local = True
                 success = False
 
         if local:
-            with open(os.path.join(self.STATIC_PATH, "music_data.json"), 'r', \
-                    encoding='utf-8') as f:
+            with open(
+                os.path.join(self.STATIC_PATH, "music_data.json"), "r", encoding="utf-8"
+            ) as f:
                 music_data = json.loads(f.read())
 
         return (music_data, success)
 
     # Retrieves Chart Data / Overwrite(Update) Chart Data
-    def _chart_stat_get(self, local: bool) -> Tuple[dict,bool]:
+    def _chart_stat_get(self, local: bool) -> Tuple[dict, bool]:
         """
         Not Local: Get Chart Stats From Diving Fish Server
         Local: Read Chart Stats From Local File
@@ -332,24 +342,33 @@ class Maimai(object):
             chart_stats = self._api_data_get("chart")
 
             if isinstance(chart_stats, dict):
-                with open(os.path.join(self.STATIC_PATH, "chart_stats.json"), 'w', \
-                        encoding='utf-8') as f:
+                with open(
+                    os.path.join(self.STATIC_PATH, "chart_stats.json"),
+                    "w",
+                    encoding="utf-8",
+                ) as f:
                     f.write(json.dumps(chart_stats, ensure_ascii=False, indent=4))
             else:
-                mh.output('maimaiDX谱面数据获取失败,切换至本地暂存文件',\
-                        'WARNING',background = 'WHITE')
+                mh.output(
+                    "maimaiDX谱面数据获取失败,切换至本地暂存文件",
+                    "WARNING",
+                    background="WHITE",
+                )
                 local = True
                 success = False
 
         if local:
-            with open(os.path.join(self.STATIC_PATH, 'chart_stats.json'), 'r', \
-                    encoding='utf-8') as f:
+            with open(
+                os.path.join(self.STATIC_PATH, "chart_stats.json"),
+                "r",
+                encoding="utf-8",
+            ) as f:
                 chart_stats = json.loads(f.read())
 
         return (chart_stats, success)
 
     # Retrieves Chart Data / Overwrite(Update) Chart Data
-    def _alias_get(self, local: bool) -> Tuple[dict,bool]:
+    def _alias_get(self, local: bool) -> Tuple[dict, bool]:
         """
         Not Local: Get Song Alias From yuzuai Server
         Local: Read Alias From Local File
@@ -359,24 +378,33 @@ class Maimai(object):
             alias_data = self._alias_api_data_get("alias")
 
             if isinstance(alias_data, list):
-                with open(os.path.join(self.STATIC_PATH, "music_alias.json"), 'w',\
-                        encoding='utf-8') as f:
+                with open(
+                    os.path.join(self.STATIC_PATH, "music_alias.json"),
+                    "w",
+                    encoding="utf-8",
+                ) as f:
                     f.write(json.dumps(alias_data, ensure_ascii=False, indent=4))
             else:
-                mh.output("maimaiDX歌曲别名数据获取失败,切换为本地暂存文件",\
-                        'WARNING',background = 'WHITE')
+                mh.output(
+                    "maimaiDX歌曲别名数据获取失败,切换为本地暂存文件",
+                    "WARNING",
+                    background="WHITE",
+                )
                 local = True
                 success = False
         if local:
-            with open(os.path.join(self.STATIC_PATH, "music_alias.json"), 'r',\
-                    encoding='utf-8') as f:
+            with open(
+                os.path.join(self.STATIC_PATH, "music_alias.json"),
+                "r",
+                encoding="utf-8",
+            ) as f:
                 alias_data = json.loads(f.read())
 
         return (alias_data, success)
 
     # Aggregate Update Function
     def static_update(self, args):
-        status = ["ERROR","OK"]
+        status = ["ERROR", "OK"]
         reply = "更新结果:\n"
         reply += f"曲目数据: {status[int(self._music_get(local = False)[1])]}\n"
         reply += f"谱面数据: {status[int(self._chart_stat_get(local = False)[1])]}\n"
@@ -421,27 +449,30 @@ class Maimai(object):
         logo_pic = self.b50_helper.logo
         name_base_pic = self.b50_helper.name_base_pic
         shougou_base_pic = self.b50_helper.shougou_base_pic
-        dx_rating_pic = Image.open(os.path.join(PIC_PATH, \
-                                self.b50_helper._rating_pic(ra))).resize((425, 80))
-        match_level_pic = Image.open(os.path.join(PIC_PATH, \
-                                self.b50_helper._match_level_pic(add_ra))).resize((128, 58))
+        dx_rating_pic = Image.open(
+            os.path.join(PIC_PATH, self.b50_helper._rating_pic(ra))
+        ).resize((425, 80))
+        match_level_pic = Image.open(
+            os.path.join(PIC_PATH, self.b50_helper._match_level_pic(add_ra))
+        ).resize((128, 58))
         # class_pic = Image.open(os.path.join(PIC_PATH,\
         #                         "UI_FBR_Class_00.png")).resize((144, 87))
 
         # Load Plate if any
         if plate:
-            plate_pic = Image.open(os.path.join(PLATE_PATH,\
-                                        f"{plate}.png")).resize((1420, 230))
+            plate_pic = Image.open(os.path.join(PLATE_PATH, f"{plate}.png")).resize(
+                (1420, 230)
+            )
         else:
-            plate_pic = Image.open(os.path.join(PIC_PATH,\
-                                        "UI_Plate_300101.png")).resize((1420, 230))
+            plate_pic = Image.open(
+                os.path.join(PIC_PATH, "UI_Plate_300101.png")
+            ).resize((1420, 230))
 
         ### Generate Best Image ###
         # Base Image
-        im = Image.open(os.path.join(PIC_PATH,\
-                                     "b50_bg.png")).convert('RGBA')
+        im = Image.open(os.path.join(PIC_PATH, "b50_bg.png")).convert("RGBA")
         # Draw Logo
-        im.alpha_composite(logo_pic,(5,130))
+        im.alpha_composite(logo_pic, (5, 130))
 
         # Draw Plate
         im.alpha_composite(plate_pic, (390, 100))
@@ -453,7 +484,7 @@ class Maimai(object):
         im.alpha_composite(dx_rating_pic, (620, 108))
         im.alpha_composite(name_base_pic, (620, 200))
         im.alpha_composite(match_level_pic, (935, 205))
-        im.alpha_composite(shougou_base_pic, (620,275))
+        im.alpha_composite(shougou_base_pic, (620, 275))
 
         # Writing Information
         text_im = ImageDraw.Draw(im)
@@ -465,25 +496,34 @@ class Maimai(object):
         _nosa = ImageFont.truetype(nosa, 40)
 
         # Write Player Name
-        text_im.text((635,235), nickname.upper(),\
-                     font=_tb, fill =(0,0,0,255), anchor = 'lm')
+        text_im.text(
+            (635, 235), nickname.upper(), font=_tb, fill=(0, 0, 0, 255), anchor="lm"
+        )
 
         # Write Split Rating
         total_ra = ra
         total_ra = f"{total_ra:05d}"
-        text_im.text((847, 300), f"STAYIN' IN THE FESTiVAL",\
-                     font=_siyuan, fill= (0,0,0,255), anchor = 'mm')
+        text_im.text(
+            (847, 300),
+            f"STAYIN' IN THE FESTiVAL",
+            font=_siyuan,
+            fill=(0, 0, 0, 255),
+            anchor="mm",
+        )
 
         # Write Credits
-        credits_msg = "Generated by WINDBOT | Ported by Windsun | Design by Yuri-YuzuchaN"
-        text_im.text((900, 2365), credits_msg,\
-                     font = _tb, fill = (103,20,141,255), anchor = 'mm')
+        credits_msg = (
+            "Generated by WINDBOT | Ported by Windsun | Design by Yuri-YuzuchaN"
+        )
+        text_im.text(
+            (900, 2365), credits_msg, font=_tb, fill=(103, 20, 141, 255), anchor="mm"
+        )
 
         # Write Rating(Shougou) Bar
         for n, i in enumerate(total_ra):
             if n == 0 and i == 0:
                 continue
-            num_pic = Image.open(os.path.join(PIC_PATH, f"UI_NUM_Drating_{i}.png")) 
+            num_pic = Image.open(os.path.join(PIC_PATH, f"UI_NUM_Drating_{i}.png"))
             im.alpha_composite(num_pic, (820 + 33 * n, 133))
 
         ## Drawing Song Info
@@ -491,8 +531,8 @@ class Maimai(object):
         im = self.b50_helper.best_2_image(im, old_best, True)
 
         return im
-    
-    # The User's Maimai B50 Function. 
+
+    # The User's Maimai B50 Function.
     def maimai_b50(self, args):
         func_data = args[0]
         usr_id = args[1]
@@ -504,8 +544,8 @@ class Maimai(object):
             gamertag = func_data[0]
         # User didn't provide Gamertag, get from WB DB
         else:
-            gamertag  = wb_db.fetch("Users", ["maiID"], "wxid", usr_id)[0][0]
-            if gamertag == '-1':
+            gamertag = wb_db.fetch("Users", ["maiID"], "wxid", usr_id)[0][0]
+            if gamertag == "-1":
                 reply = "您未绑定maimai查分器ID。请使用bind指令绑定。\n"
                 reply += f"请注意，请绑定您在{self.DIVING_FISH_WEBSITE}中的用户名。\n"
                 reply += f"示例: {BOT_GC_INVOKER} bind mai xxxxx"
@@ -514,7 +554,7 @@ class Maimai(object):
         # Draw the Image
         image = self._draw_best_image(gamertag)
 
-        # If error happened in image drawing 
+        # If error happened in image drawing
         if isinstance(image, int):
             # No Disclose Error
             if image == -2:
@@ -538,18 +578,18 @@ class Maimai(object):
     ######## Helper Functions ########
     # Fuzzy find music data by title.
     def _music_by_fuzzy_title(self, title, QRatio) -> list:
-        music_data = self._music_get(local = True)[0]
+        music_data = self._music_get(local=True)[0]
         results = list()
         for song in music_data:
             song_title = song["title"]
-            
+
             if fuzz.QRatio(title.lower(), song_title.lower()) >= QRatio:
                 results.append(song)
         return results
 
-    # Find music data by song_id 
+    # Find music data by song_id
     def _music_by_id(self, song_id: int) -> list:
-        music_data = self._music_get(local = True)[0]
+        music_data = self._music_get(local=True)[0]
         result = list()
 
         for song in music_data:
@@ -561,7 +601,7 @@ class Maimai(object):
     # Random
     def music_random(self, args):
         func_data = args[0]
-        music_data = self._music_get(local = True)[0]
+        music_data = self._music_get(local=True)[0]
         random_type = None
 
         # If user does not specify level, do all random
@@ -667,7 +707,7 @@ class Maimai(object):
                 reply = f"WB没有搜寻到结果。您查找了: {keyword}"
             return mh.compose_txt_msg(reply)
 
-        # Too Many Results 
+        # Too Many Results
         elif len(results) > 5:
             reply = "WB找到的结果过多（很沉！>_<）。\n"
             reply += "请尝试优化搜索词。"
@@ -692,7 +732,7 @@ class Maimai(object):
                 diff = self.DIFF_LIST_SHORT[i]
                 const = song["ds"][i]
                 diff_str = f"{diff}{const}"
-                diffs_info.append(diff_str) 
+                diffs_info.append(diff_str)
             diffs_info_str = " | ".join(diffs_info)
 
             reply += f"\n[{chart_type}]{new_txt} {artist} - {title}"
@@ -710,8 +750,8 @@ class Maimai(object):
         BOT_GC_INVOKER = args[-1][1]
 
         # Get Gamertag
-        gamertag  = wb_db.fetch("Users", ["maiID"], "wxid", usr_id)[0][0]
-        if gamertag == '-1':
+        gamertag = wb_db.fetch("Users", ["maiID"], "wxid", usr_id)[0][0]
+        if gamertag == "-1":
             reply = "您未绑定maimai查分器ID。请使用bind指令绑定。\n"
             reply += f"请注意，请绑定您在{self.DIVING_FISH_WEBSITE}中的用户名。\n"
             reply += f"示例: {BOT_GC_INVOKER} bind mai xxxxx"
@@ -768,7 +808,7 @@ class Maimai(object):
 
     # The user's Maimai Alias Search.
     def music_alias_search(self, args):
-        alias_data = self._alias_get(local = True)[0]
+        alias_data = self._alias_get(local=True)[0]
         func_data = args[0]
 
         results = list()
@@ -776,14 +816,14 @@ class Maimai(object):
         if len(func_data) == 0:
             reply = "请提供WB用于搜索的别名。"
             return mh.compose_txt_msg(reply)
-        
+
         # Search for alias
         keyword = " ".join(func_data)
         for song in alias_data:
             if keyword in song["Alias"]:
                 song_info = self._music_by_id(song["SongID"])
                 results += song_info
-        
+
         if len(results) == 0:
             reply = f"WB没有找到结果。您查找了：{keyword}"
         elif len(results) > 10:
@@ -797,8 +837,10 @@ class Maimai(object):
                 reply += f"\n[{idx+1}] {title} (ID{song_id})"
         return mh.compose_txt_msg(reply)
 
+
 class Mai_B50(object):
     """Maimai B50 Image Drawing"""
+
     def __init__(self, music_data, material_path):
         super(Mai_B50, self).__init__()
         self.MATERIAL_PATH = material_path
@@ -813,8 +855,12 @@ class Mai_B50(object):
     # Load Material Assets.
     def _init_material(self) -> None:
         # Load DX Stars
-        self.dx_star_pics = [Image.open(os.path.join(self.PIC_PATH,\
-                       f'UI_GAM_Gauge_DXScoreIcon_0{_ + 1}.png')) for _ in range(5)]
+        self.dx_star_pics = [
+            Image.open(
+                os.path.join(self.PIC_PATH, f"UI_GAM_Gauge_DXScoreIcon_0{_ + 1}.png")
+            )
+            for _ in range(5)
+        ]
 
         # Load Difficulty Background
         bas_bg = Image.open(os.path.join(self.PIC_PATH, "b50_score_basic.png"))
@@ -825,99 +871,118 @@ class Mai_B50(object):
         self.diff_bg = [bas_bg, adv_bg, exp_bg, mas_bg, remas_bg]
 
         # Load Fonts
-        self.Torus_SemiBold = os.path.join(self.MATERIAL_PATH, 'Torus SemiBold.otf')
-        self.siyuan = os.path.join(self.MATERIAL_PATH, 'SourceHanSansSC-Bold.otf')
-        self.meiryo = os.path.join(self.MATERIAL_PATH, 'meiryo.ttc')
-        self.nosa = os.path.join(self.MATERIAL_PATH, 'NOSA.ttf')
+        self.Torus_SemiBold = os.path.join(self.MATERIAL_PATH, "Torus SemiBold.otf")
+        self.siyuan = os.path.join(self.MATERIAL_PATH, "SourceHanSansSC-Bold.otf")
+        self.meiryo = os.path.join(self.MATERIAL_PATH, "meiryo.ttc")
+        self.nosa = os.path.join(self.MATERIAL_PATH, "NOSA.ttf")
 
         # Load Pic Assets
-        self.logo = Image.open(os.path.join(self.PIC_PATH,\
-                                "logo.png")).resize((378, 172))
+        self.logo = Image.open(os.path.join(self.PIC_PATH, "logo.png")).resize(
+            (378, 172)
+        )
 
-        self.icon_pic = Image.open(os.path.join(self.PIC_PATH,\
-                                "UI_Icon_309503.png")).resize((214, 214))
+        self.icon_pic = Image.open(
+            os.path.join(self.PIC_PATH, "UI_Icon_309503.png")
+        ).resize((214, 214))
 
-        self.name_base_pic = Image.open(os.path.join(self.PIC_PATH, 'Name.png'))
-        self.shougou_base_pic = Image.open(os.path.join(self.PIC_PATH,\
-                                "UI_CMN_Shougou_Rainbow.png")).resize((454, 50))
+        self.name_base_pic = Image.open(os.path.join(self.PIC_PATH, "Name.png"))
+        self.shougou_base_pic = Image.open(
+            os.path.join(self.PIC_PATH, "UI_CMN_Shougou_Rainbow.png")
+        ).resize((454, 50))
 
     # Updates the music data.
     def _update_music_data(self, music_data) -> None:
         self.MAI_MUSIC_DATA = music_data
 
     # Image 2 base64 Helper.
-    def image_to_base64(self, img: Image.Image, fileFormat = 'PNG') -> str:
+    def image_to_base64(self, img: Image.Image, fileFormat="PNG") -> str:
         output_buffer = BytesIO()
         img.save(output_buffer, fileFormat)
         byte_data = output_buffer.getvalue()
         base64_str = base64.b64encode(byte_data).decode()
 
-        return 'base64://' + base64_str
+        return "base64://" + base64_str
 
     # Check if a character is CJK
     def is_cjk(self, character):
-        """"
+        """ "
         Checks whether character is CJK.
 
             >>> is_cjk(u'\u33fe')
             True
-            >>> is_cjk(u'\uFE5F')
+            >>> is_cjk(u'\ufe5f')
             False
 
         :param character: The character that needs to be checked.
         :type character: char
         :return: bool
         """
-        return any([start <= ord(character) <= end for start, end in
-                    [(4352, 4607), (11904, 42191), (43072, 43135), (44032, 55215),
-                     (63744, 64255), (65072, 65103), (65381, 65500),
-                     (131072, 196607)]
-                    ])
+        return any(
+            [
+                start <= ord(character) <= end
+                for start, end in [
+                    (4352, 4607),
+                    (11904, 42191),
+                    (43072, 43135),
+                    (44032, 55215),
+                    (63744, 64255),
+                    (65072, 65103),
+                    (65381, 65500),
+                    (131072, 196607),
+                ]
+            ]
+        )
 
     # Rating Computation from Constant & Achievement
-    def computeRa(self, ds: float, achievement: float, onlyrate: bool = False, israte: bool = False) -> Union[int, Tuple[int, str]]:
+    def computeRa(
+        self,
+        ds: float,
+        achievement: float,
+        onlyrate: bool = False,
+        israte: bool = False,
+    ) -> Union[int, Tuple[int, str]]:
         if achievement < 50:
             baseRa = 7.0
-            rate = 'D'
+            rate = "D"
         elif achievement < 60:
             baseRa = 8.0
-            rate = 'C'
+            rate = "C"
         elif achievement < 70:
             baseRa = 9.6
-            rate = 'B'
+            rate = "B"
         elif achievement < 75:
             baseRa = 11.2
-            rate = 'BB'
+            rate = "BB"
         elif achievement < 80:
             baseRa = 12.0
-            rate = 'BBB'
+            rate = "BBB"
         elif achievement < 90:
             baseRa = 13.6
-            rate = 'A'
+            rate = "A"
         elif achievement < 94:
             baseRa = 15.2
-            rate = 'AA'
+            rate = "AA"
         elif achievement < 97:
             baseRa = 16.8
-            rate = 'AAA'
+            rate = "AAA"
         elif achievement < 98:
             baseRa = 20.0
-            rate = 'S'
+            rate = "S"
         elif achievement < 99:
             baseRa = 20.3
-            rate = 'Sp'
+            rate = "Sp"
         elif achievement < 99.5:
             baseRa = 20.8
-            rate = 'SS'
+            rate = "SS"
         elif achievement < 100:
             baseRa = 21.1
-            rate = 'SSp'
+            rate = "SSp"
         elif achievement < 100.5:
             baseRa = 21.6
-            rate = 'SSS'
+            rate = "SSS"
         else:
             baseRa = 22.4
-            rate = 'SSSp'
+            rate = "SSSp"
 
         if israte:
             data = (math.floor(ds * (min(100.5, achievement) / 100) * baseRa), rate)
@@ -931,13 +996,46 @@ class Mai_B50(object):
     # Character Width Helper
     def _getCharWidth(self, o) -> int:
         widths = [
-            (126, 1), (159, 0), (687, 1), (710, 0), (711, 1), (727, 0), (733, 1), (879, 0), (1154, 1), (1161, 0),
-            (4347, 1), (4447, 2), (7467, 1), (7521, 0), (8369, 1), (8426, 0), (9000, 1), (9002, 2), (11021, 1),
-            (12350, 2), (12351, 1), (12438, 2), (12442, 0), (19893, 2), (19967, 1), (55203, 2), (63743, 1),
-            (64106, 2), (65039, 1), (65059, 0), (65131, 2), (65279, 1), (65376, 2), (65500, 1), (65510, 2),
-            (120831, 1), (262141, 2), (1114109, 1),
+            (126, 1),
+            (159, 0),
+            (687, 1),
+            (710, 0),
+            (711, 1),
+            (727, 0),
+            (733, 1),
+            (879, 0),
+            (1154, 1),
+            (1161, 0),
+            (4347, 1),
+            (4447, 2),
+            (7467, 1),
+            (7521, 0),
+            (8369, 1),
+            (8426, 0),
+            (9000, 1),
+            (9002, 2),
+            (11021, 1),
+            (12350, 2),
+            (12351, 1),
+            (12438, 2),
+            (12442, 0),
+            (19893, 2),
+            (19967, 1),
+            (55203, 2),
+            (63743, 1),
+            (64106, 2),
+            (65039, 1),
+            (65059, 0),
+            (65131, 2),
+            (65279, 1),
+            (65376, 2),
+            (65500, 1),
+            (65510, 2),
+            (120831, 1),
+            (262141, 2),
+            (1114109, 1),
         ]
-        if o == 0xe or o == 0xf:
+        if o == 0xE or o == 0xF:
             return 0
         for num, wid in widths:
             if o <= num:
@@ -959,44 +1057,44 @@ class Mai_B50(object):
             res += self._getCharWidth(ord(ch))
             if res <= length:
                 sList.append(ch)
-        return ''.join(sList)
+        return "".join(sList)
 
     # Concatenate File Name for Rating Picture
-    def _rating_pic(self, rating:int) -> str:
+    def _rating_pic(self, rating: int) -> str:
         if rating < 1000:
-            num = '01'
+            num = "01"
         elif rating < 2000:
-            num = '02'
+            num = "02"
         elif rating < 4000:
-            num = '03'
+            num = "03"
         elif rating < 7000:
-            num = '04'
+            num = "04"
         elif rating < 10000:
-            num = '05'
+            num = "05"
         elif rating < 12000:
-            num = '06'
+            num = "06"
         elif rating < 13000:
-            num = '07'
+            num = "07"
         elif rating < 14000:
-            num = '08'
+            num = "08"
         elif rating < 14500:
-            num = '09'
+            num = "09"
         elif rating < 15000:
-            num = '10'
+            num = "10"
         else:
-            num = '11'
-        return f'UI_CMN_DXRating_{num}.png'
+            num = "11"
+        return f"UI_CMN_DXRating_{num}.png"
 
     # Concatenate File Name for Friend Match Picture
-    def _match_level_pic(self, add_rating:int) -> str:
+    def _match_level_pic(self, add_rating: int) -> str:
         if add_rating <= 10:
-            num = f'{add_rating:02d}'
+            num = f"{add_rating:02d}"
         else:
-            num = f'{add_rating + 1:02d}'
-        return f'UI_DNM_DaniPlate_{num}.png'
+            num = f"{add_rating + 1:02d}"
+        return f"UI_DNM_DaniPlate_{num}.png"
 
     # DX Score to Star Helper.
-    def dxscore_2_star(self, dx:int, target_sid:int, lvl:int) -> int:
+    def dxscore_2_star(self, dx: int, target_sid: int, lvl: int) -> int:
         # Find Song
         song_data = None
         for song in self.MAI_MUSIC_DATA:
@@ -1025,18 +1123,20 @@ class Mai_B50(object):
 
     # Best List to Image
     def best_2_image(self, output: Image.Image, data: list, isOld: bool):
-        '''
+        """
         isOld = True 放在旧版本位置
         isOld = False 放在新版本位置
-        ''' 
+        """
         y = 430 if isOld else 1670
         dy = 170
 
-        TEXT_COLOR = [(255, 255, 255, 255), \
-                      (255, 255, 255, 255), \
-                      (255, 255, 255, 255), \
-                      (255, 255, 255, 255), \
-                      (103, 20, 141, 255)]
+        TEXT_COLOR = [
+            (255, 255, 255, 255),
+            (255, 255, 255, 255),
+            (255, 255, 255, 255),
+            (255, 255, 255, 255),
+            (103, 20, 141, 255),
+        ]
 
         # Load Fonts
         _tb = ImageFont.truetype(self.Torus_SemiBold, 20)
@@ -1062,42 +1162,48 @@ class Mai_B50(object):
 
             # Draw Level Difficulty Base (BAS, ADV, EXP, MAS, REMAS)
             chart_diff = song_record["level_index"]
-            output.alpha_composite(self.diff_bg[chart_diff], (x,y))
+            output.alpha_composite(self.diff_bg[chart_diff], (x, y))
 
             # Draw Cover
             song_id = song_record["song_id"]
             try:
-                cover = Image.open(os.path.join(self.COVER_PATH,\
-                                    f"{song_id}.png")).resize((135, 135))
+                cover = Image.open(
+                    os.path.join(self.COVER_PATH, f"{song_id}.png")
+                ).resize((135, 135))
             except FileNotFoundError as e:
-                cover = Image.open(os.path.join(self.COVER_PATH,\
-                                    f"{random.randint(1,1)*-1}.png")).resize((135, 135))
-            output.alpha_composite(cover, (x+5, y+5))
+                cover = Image.open(
+                    os.path.join(self.COVER_PATH, f"{random.randint(1,1)*-1}.png")
+                ).resize((135, 135))
+            output.alpha_composite(cover, (x + 5, y + 5))
 
             # Draw Chart Type (DX, STD)
             chart_type = song_record["type"]
-            chart_type_pic = Image.open(os.path.join(self.PIC_PATH,\
-                                  f"{chart_type.upper()}.png")).resize((55, 19))
-            output.alpha_composite(chart_type_pic, (x+80, y+141))
+            chart_type_pic = Image.open(
+                os.path.join(self.PIC_PATH, f"{chart_type.upper()}.png")
+            ).resize((55, 19))
+            output.alpha_composite(chart_type_pic, (x + 80, y + 141))
 
             # Draw Achievement Rank
             achievement_rank = song_record["rate"].upper().replace("P", "p")
-            achievement_rank_pic = Image.open(os.path.join(self.PIC_PATH,\
-                                   f"UI_TTR_Rank_{achievement_rank}.png")).resize((95, 44))
-            output.alpha_composite(achievement_rank_pic, (x+150,y+98))
+            achievement_rank_pic = Image.open(
+                os.path.join(self.PIC_PATH, f"UI_TTR_Rank_{achievement_rank}.png")
+            ).resize((95, 44))
+            output.alpha_composite(achievement_rank_pic, (x + 150, y + 98))
 
             # if FC, Draw Full Combo Pic
             fc_status = song_record["fc"]
             if fc_status:
-                fc = Image.open(os.path.join(self.PIC_PATH,\
-                                    f"UI_MSS_MBase_Icon_{fc_status}.png")).resize((45, 45))
+                fc = Image.open(
+                    os.path.join(self.PIC_PATH, f"UI_MSS_MBase_Icon_{fc_status}.png")
+                ).resize((45, 45))
                 output.alpha_composite(fc, (x + 246, y + 99))
 
             # if FS, Draw Full Sync Pic
             fs_status = song_record["fs"]
             if fs_status:
-                fs = Image.open(os.path.join(self.PIC_PATH,\
-                                    f'UI_MSS_MBase_Icon_{fs_status}.png')).resize((45, 45))
+                fs = Image.open(
+                    os.path.join(self.PIC_PATH, f"UI_MSS_MBase_Icon_{fs_status}.png")
+                ).resize((45, 45))
                 output.alpha_composite(fs, (x + 291, y + 99))
 
             # Draw DX Star
@@ -1108,33 +1214,51 @@ class Mai_B50(object):
 
             # Write Song Information
             ## Song ID
-            text_output.text((x+40,y+148), f"ID{song_id}",\
-                             font=_tb, anchor = 'mm')
+            text_output.text((x + 40, y + 148), f"ID{song_id}", font=_tb, anchor="mm")
 
             ## Title
             title = song_record["title"]
             if self._columnWidth(title) > 18:
                 title = self._changeColumnWidth(title, 17) + "..."
-            text_output.text((x+155,y+20), title, font = _siyuan,\
-                             fill = TEXT_COLOR[chart_diff], anchor = 'lm')
+            text_output.text(
+                (x + 155, y + 20),
+                title,
+                font=_siyuan,
+                fill=TEXT_COLOR[chart_diff],
+                anchor="lm",
+            )
 
             ## Achievement
             achievement_rate = song_record["achievements"]
-            p, s = f"{achievement_rate:.4f}".split('.')
+            p, s = f"{achievement_rate:.4f}".split(".")
             r = _tbAchieve1.getbbox(p)
 
-            text_output.text((x+155,y+70), p, font = _tbAchieve1,\
-                             fill = TEXT_COLOR[chart_diff], anchor = 'ld')
+            text_output.text(
+                (x + 155, y + 70),
+                p,
+                font=_tbAchieve1,
+                fill=TEXT_COLOR[chart_diff],
+                anchor="ld",
+            )
 
-            text_output.text((x+155+ r[2],y+68), f".{s}%", font = _tbAchieve2,\
-                             fill = TEXT_COLOR[chart_diff], anchor = 'ld')
+            text_output.text(
+                (x + 155 + r[2], y + 68),
+                f".{s}%",
+                font=_tbAchieve2,
+                fill=TEXT_COLOR[chart_diff],
+                anchor="ld",
+            )
 
             # Single Rating
             chart_const = song_record["ds"]
             computed_ra = self.computeRa(chart_const, achievement_rate)
-            text_output.text((x+155,y+80),\
-                             f"Rating {chart_const} -> {computed_ra}", font = _tbRating,\
-                             fill = TEXT_COLOR[chart_diff], anchor = 'lm')
+            text_output.text(
+                (x + 155, y + 80),
+                f"Rating {chart_const} -> {computed_ra}",
+                font=_tbRating,
+                fill=TEXT_COLOR[chart_diff],
+                anchor="lm",
+            )
 
             # Increment the Song Per Row Record
             num += 1
