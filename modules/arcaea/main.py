@@ -140,6 +140,9 @@ class Arcaea(object):
             ) as f:
                 song_dict = json.loads(f.read())
 
+        # To handle deleted songs.
+        song_dict["songs"] = [s for s in song_dict["songs"] if s.get("deleted", False)]
+
         return (song_dict, success)
 
     # Fetch or Get Locally the chart data.
@@ -570,7 +573,7 @@ class Arcaea(object):
 
         return mh.compose_txt_msg(reply)
 
-    # fuzzy find music data by title.
+    # Fuzzy find music data by title.
     def _music_by_fuzzy_title(self, title, QRatio) -> list:
         music_data = self._music_get(local=True)[0]["songs"]
         results = []
