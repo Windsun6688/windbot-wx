@@ -60,7 +60,7 @@ class Arcaea(object):
         self.ARC_WIKI_API = "https://arcwiki.mcd.blue/api.php?action=parse&format=json&curtimestamp=1&redirects=1&prop=wikitext&page="
 
         self.DIFF_LIST = ["PST", "PRS", "FTR", "BYD", "ETR"]
-        self.SONG_SIDES = ["光", "对立", "消色"]
+        self.SONG_SIDES = ["光", "对立", "消色", "殸"]
         self.UNLOCK_TXT = ["无需爬梯解锁", "需要爬梯解锁"]
         self.DL_TXT = ["无需下载", "需要下载"]
 
