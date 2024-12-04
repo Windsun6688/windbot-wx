@@ -141,7 +141,7 @@ class Arcaea(object):
                 song_dict = json.loads(f.read())
 
         # To handle deleted songs.
-        song_dict["songs"] = [s for s in song_dict["songs"] if s.get("deleted", False)]
+        song_dict["songs"] = [s for s in song_dict["songs"] if not (s.get("deleted", False))]
 
         return (song_dict, success)
 
