@@ -125,6 +125,7 @@ class Arcaea(object):
                 ) as f:
                     f.write(song_dict)
                     f.close()
+                song_dict = json.loads(song_dict)
             else:
                 mh.output(
                     "Arcaea曲目数据获取失败,切换至本地暂存文件",
@@ -141,7 +142,9 @@ class Arcaea(object):
                 song_dict = json.loads(f.read())
 
         # To handle deleted songs.
-        song_dict["songs"] = [s for s in song_dict["songs"] if not (s.get("deleted", False))]
+        song_dict["songs"] = [
+            s for s in song_dict["songs"] if not (s.get("deleted", False))
+        ]
 
         return (song_dict, success)
 
