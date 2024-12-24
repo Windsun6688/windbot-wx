@@ -43,6 +43,10 @@ class Maimai(object):
     STATIC_PATH: str
     MAI_DATA_API: str
     MAI_ALIAS_API: str
+    DIVING_FISH_WEBSITE: str
+    DIVING_FISH_GUIDE: str
+    DIFF_LIST: list
+    DIFF_LIST_SHORT: list
     JPVER_2_CNVER: dict
     PLATE_2_VER: dict
 
@@ -54,6 +58,9 @@ class Maimai(object):
             "minfo": self.music_search,
             "mgrade": self.view_single_grade,
             "mwhat": self.music_alias_search,
+            "mgrab": self.music_grab_level,
+            "mcsts": self.charter_stat_view,
+            "mvs": self.music_artist_vs,
         }
         self.MNGNG_FUNCTIONS = {
             "mupdate": self.static_update,
@@ -405,12 +412,12 @@ class Maimai(object):
     # Aggregate Update Function
     def static_update(self, args):
         status = ["ERROR", "OK"]
-        reply = "更新结果:\n"
-        reply += f"曲目数据: {status[int(self._music_get(local = False)[1])]}\n"
-        reply += f"谱面数据: {status[int(self._chart_stat_get(local = False)[1])]}\n"
-        reply += f"别名数据: {status[int(self._alias_get(local = False)[1])]}\n"
+        resp = "更新结果:\n"
+        resp += f"曲目数据: {status[int(self._music_get(local = False)[1])]}\n"
+        resp += f"谱面数据: {status[int(self._chart_stat_get(local = False)[1])]}\n"
+        resp += f"别名数据: {status[int(self._alias_get(local = False)[1])]}\n"
 
-        return mh.compose_txt_msg(reply)
+        return mh.compose_txt_msg(resp)
 
     ######## Draw Maimai Best 50 Image ########
     # Drawing the best image.
@@ -546,10 +553,10 @@ class Maimai(object):
         else:
             gamertag = wb_db.fetch("Users", ["maiID"], "wxid", usr_id)[0][0]
             if gamertag == "-1":
-                reply = "您未绑定maimai查分器ID。请使用bind指令绑定。\n"
-                reply += f"请注意，请绑定您在{self.DIVING_FISH_WEBSITE}中的用户名。\n"
-                reply += f"示例: {BOT_GC_INVOKER} bind mai xxxxx"
-                return mh.compose_txt_msg(reply)
+                resp = "您未绑定maimai查分器ID。请使用bind指令绑定。\n"
+                resp += f"请注意，请绑定您在{self.DIVING_FISH_WEBSITE}中的用户名。\n"
+                resp += f"示例: {BOT_GC_INVOKER} bind mai xxxxx"
+                return mh.compose_txt_msg(resp)
 
         # Draw the Image
         image = self._draw_best_image(gamertag)
@@ -558,18 +565,18 @@ class Maimai(object):
         if isinstance(image, int):
             # No Disclose Error
             if image == -2:
-                reply = "该用户选择不公开数据。"
+                resp = "该用户选择不公开数据。"
 
             # No Data Error
             elif image == -1:
-                reply = f"查分器没有返回数据,请检查您绑定的查分器用户ID。\n"
-                reply += f"目前绑定: {gamertag}\n"
-                reply += f"如果您没有导入过游玩数据,请参考{self.DIVING_FISH_GUIDE}。"
+                resp = f"查分器没有返回数据,请检查您绑定的查分器用户ID。\n"
+                resp += f"目前绑定: {gamertag}\n"
+                resp += f"如果您没有导入过游玩数据,请参考{self.DIVING_FISH_GUIDE}。"
 
             # Unknown Error
             elif image == 0:
-                reply = "发生未知错误。"
-            return mh.compose_txt_msg(reply)
+                resp = "发生未知错误。"
+            return mh.compose_txt_msg(resp)
         else:
             storage_path = os.path.join(self.MAI_BEST_IMG_PATH, f"{gamertag}.png")
             image.save(storage_path, optimize=True, quality=60)
@@ -597,9 +604,47 @@ class Maimai(object):
                 result.append(song)
         return result
 
+    # Find music by artist name.
+    def _music_by_artist(self, target_artist: str) -> list:
+        music_data = self._music_get(local = True)[0]
+        result = list()
+
+        for song in music_data:
+            artist = song["basic_info"]["artist"]
+            artist_splitted = artist.split(" ")
+            if (target_artist == artist) or (target_artist in artist_splitted):
+                result.append(song)
+
+        return result
+
+    # Find charts by constant.
+    def _charts_by_constant(self, target_constant: float) -> dict:
+        music_data = self._music_get(local=True)[0]
+        result = dict()
+
+        for song in music_data:
+            matching_idx = [i for i, x in enumerate(song["ds"]) if x == target_constant]
+            result[song["id"]] = [song, matching_idx]
+
+        return result
+
+    # Find numbers of chart by charter
+    def _charts_cnt_by_charter(self) -> dict:
+        music_data = self._music_get(local=True)[0]
+        result = dict()
+
+        for song in music_data:
+            for chart in song["charts"]:
+                if result.get(chart["charter"], None) == None:
+                    result[chart["charter"]] = 1
+                else:
+                    result[chart["charter"]] += 1
+
+        return result
+
     ######## User Functions ########
     # Random
-    def music_random(self, args):
+    def music_random(self, args) -> dict:
         func_data = args[0]
         music_data = self._music_get(local=True)[0]
         random_type = None
@@ -629,14 +674,14 @@ class Maimai(object):
 
         # If no results found
         if len(result_songs) == 0:
-            reply = f"WB没有找到歌曲。"
-            return mh.compose_txt_msg(reply)
+            resp = f"WB没有找到歌曲。"
+            return mh.compose_txt_msg(resp)
 
         # Random
         chosen_song_data = random.choice(result_songs)
 
         # Build Reply
-        reply = f"WB为您从{len(result_songs)}首歌曲中选择了:\n"
+        resp = f"WB为您从{len(result_songs)}首歌曲中选择了:\n"
 
         title = chosen_song_data["basic_info"]["title"]
         artist = chosen_song_data["basic_info"]["artist"]
@@ -649,13 +694,13 @@ class Maimai(object):
             for i in range(len(chosen_song_data["ds"])):
                 if float(const) == chosen_song_data["ds"][i]:
                     level_diff = self.DIFF_LIST_SHORT[i]
-            reply += f"[{chart_type} {level_diff} {const}] {artist} - {title}\n"
+            resp += f"[{chart_type} {level_diff} {const}] {artist} - {title}\n"
 
         elif random_type == "general":
             for i in range(len(chosen_song_data["level"])):
                 if level == chosen_song_data["level"][i]:
                     level_diff = self.DIFF_LIST_SHORT[i]
-            reply += f"[{chart_type} {level_diff} {level}] {artist} - {title}\n"
+            resp += f"[{chart_type} {level_diff} {level}] {artist} - {title}\n"
 
         elif random_type == "wildcard":
             max_diff = len(chosen_song_data["level"])
@@ -664,20 +709,20 @@ class Maimai(object):
             level_diff = self.DIFF_LIST_SHORT[random_diff]
             const = chosen_song_data["ds"][random_diff]
 
-            reply += f"[{chart_type} {level_diff} {const}] {artist} - {title}\n"
+            resp += f"[{chart_type} {level_diff} {const}] {artist} - {title}\n"
 
-        reply += f"分区：{genre} | SID {song_id}"
-        return mh.compose_txt_msg(reply)
+        resp += f"分区：{genre} | SID {song_id}"
+        return mh.compose_txt_msg(resp)
 
     # The user's Maimai Info Search.
-    def music_search(self, args):
+    def music_search(self, args) -> dict:
         func_data = args[0]
         search_type = None
 
         # No Data Provided
         if len(func_data) == 0:
-            reply = "请提供搜索的乐曲标题或SID。"
-            return mh.compose_txt_msg(reply)
+            resp = "请提供搜索的乐曲标题或SID。"
+            return mh.compose_txt_msg(resp)
 
         # Precise search
         if func_data[0].lower() == "p":
@@ -702,19 +747,19 @@ class Maimai(object):
         # No Results
         if len(results) == 0:
             if search_type == "sid":
-                reply = f"WB没有搜寻到结果。您查找了SID: {keyword}"
+                resp = f"WB没有搜寻到结果。您查找了SID: {keyword}"
             else:
-                reply = f"WB没有搜寻到结果。您查找了: {keyword}"
-            return mh.compose_txt_msg(reply)
+                resp = f"WB没有搜寻到结果。您查找了: {keyword}"
+            return mh.compose_txt_msg(resp)
 
         # Too Many Results
         elif len(results) > 5:
-            reply = "WB找到的结果过多（很沉！>_<）。\n"
-            reply += "请尝试优化搜索词。"
-            return mh.compose_txt_msg(reply)
+            resp = "WB找到的结果过多（很沉！>_<）。\n"
+            resp += "请尝试优化搜索词。"
+            return mh.compose_txt_msg(resp)
 
         # Reasonable Results
-        reply = f"共找到以下{len(results)}个结果:"
+        resp = f"共找到以下{len(results)}个结果:"
         for song in results:
             song_id = song["id"]
             title = song["title"]
@@ -735,15 +780,15 @@ class Maimai(object):
                 diffs_info.append(diff_str)
             diffs_info_str = " | ".join(diffs_info)
 
-            reply += f"\n[{chart_type}]{new_txt} {artist} - {title}"
-            reply += f"\n-版本：{CN_version} | 分区：{category} | BPM{bpm}"
-            reply += f"\n--{diffs_info_str}"
-            reply += f"\n---SID：{song_id}\n"
+            resp += f"\n[{chart_type}]{new_txt} {artist} - {title}"
+            resp += f"\n-版本：{CN_version} | 分区：{category} | BPM{bpm}"
+            resp += f"\n--{diffs_info_str}"
+            resp += f"\n---SID：{song_id}\n"
 
-        return mh.compose_txt_msg(reply)
+        return mh.compose_txt_msg(resp)
 
     # The user's Maimai Single Grade View.
-    def view_single_grade(self, args):
+    def view_single_grade(self, args) -> dict:
         func_data = args[0]
         usr_id = args[1]
         wb_db = args[-1][0]
@@ -752,15 +797,15 @@ class Maimai(object):
         # Get Gamertag
         gamertag = wb_db.fetch("Users", ["maiID"], "wxid", usr_id)[0][0]
         if gamertag == "-1":
-            reply = "您未绑定maimai查分器ID。请使用bind指令绑定。\n"
-            reply += f"请注意，请绑定您在{self.DIVING_FISH_WEBSITE}中的用户名。\n"
-            reply += f"示例: {BOT_GC_INVOKER} bind mai xxxxx"
-            return mh.compose_txt_msg(reply)
+            resp = "您未绑定maimai查分器ID。请使用bind指令绑定。\n"
+            resp += f"请注意，请绑定您在{self.DIVING_FISH_WEBSITE}中的用户名。\n"
+            resp += f"示例: {BOT_GC_INVOKER} bind mai xxxxx"
+            return mh.compose_txt_msg(resp)
 
         # User did not provide SID
         if len(func_data) == 0:
-            reply = "请提供SID。"
-            return mh.compose_txt_msg(reply)
+            resp = "请提供SID。"
+            return mh.compose_txt_msg(resp)
 
         target_sid_list = func_data
         song_info_list = list()
@@ -768,29 +813,29 @@ class Maimai(object):
         # Not Numeric
         for target_sid in target_sid_list:
             if not target_sid.isnumeric():
-                reply = f"请提供纯数字的SID。"
-                return mh.compose_txt_msg(reply)
+                resp = f"请提供纯数字的SID。"
+                return mh.compose_txt_msg(resp)
 
             song_info = self._music_by_id(int(target_sid))
             if len(song_info) == 0:
-                reply = f"WB没有找到SID为{target_sid}的歌曲。"
-                return mh.compose_txt_msg(reply)
+                resp = f"WB没有找到SID为{target_sid}的歌曲。"
+                return mh.compose_txt_msg(resp)
             else:
                 song_info_list += song_info
 
         usr_record = self._api_query_dev(gamertag, "single", target_sid_list)
         # User choose to not disclose data
         if usr_record == -2:
-            reply = "该用户选择不公开数据。"
-            return mh.compose_txt_msg(reply)
+            resp = "该用户选择不公开数据。"
+            return mh.compose_txt_msg(resp)
 
-        reply = f"Player: {gamertag}"
+        resp = f"Player: {gamertag}"
 
         for idx, song_info in enumerate(song_info_list):
             song_id = target_sid_list[idx]
             song_record = usr_record.get(song_id, list())
 
-            reply += f"\n[{idx+1}] {song_info['title']} <ID{song_id}>"
+            resp += f"\n[{idx+1}] {song_info['title']} <ID{song_id}>"
 
             for i, const in enumerate(song_info["ds"]):
                 diff_str = self.DIFF_LIST_SHORT[i]
@@ -800,22 +845,22 @@ class Maimai(object):
                     if record["level_index"] == i:
                         achievement = f"{record['achievements']}%"
                         dx_score = record["dxScore"]
-                reply += f"\n-[{diff_str} {const}] {achievement} (DxS:{dx_score})"
+                resp += f"\n-[{diff_str} {const}] {achievement} (DxS:{dx_score})"
 
-            reply += "\n"
+            resp += "\n"
 
-        return mh.compose_txt_msg(reply)
+        return mh.compose_txt_msg(resp)
 
     # The user's Maimai Alias Search.
-    def music_alias_search(self, args):
+    def music_alias_search(self, args) -> dict:
         alias_data = self._alias_get(local=True)[0]
         func_data = args[0]
 
         results = list()
         # User didn't provide input
         if len(func_data) == 0:
-            reply = "请提供WB用于搜索的别名。"
-            return mh.compose_txt_msg(reply)
+            resp = "请提供WB用于搜索的别名。"
+            return mh.compose_txt_msg(resp)
 
         # Search for alias
         keyword = " ".join(func_data)
@@ -825,17 +870,124 @@ class Maimai(object):
                 results += song_info
 
         if len(results) == 0:
-            reply = f"WB没有找到结果。您查找了：{keyword}"
+            resp = f"WB没有找到结果。您查找了：{keyword}"
         elif len(results) > 10:
-            reply = f"WB找到了太多结果({len(results)}个！)"
-            reply += "\n请尝试搜索其他别名。"
+            resp = f"WB找到了太多结果({len(results)}个！)"
+            resp += "\n请尝试搜索其他别名。"
         else:
-            reply = f"这个别名可能指向以下{len(results)}首歌："
+            resp = f"这个别名可能指向以下{len(results)}首歌："
             for idx, song_info in enumerate(results):
                 title = song_info["title"]
                 song_id = song_info["id"]
-                reply += f"\n[{idx+1}] {title} (ID{song_id})"
-        return mh.compose_txt_msg(reply)
+                resp += f"\n[{idx+1}] {title} (ID{song_id})"
+        return mh.compose_txt_msg(resp)
+
+    # The user's Maimai Grab-Song-By-Constant Search.
+    def music_grab_level(self, args: list) -> dict:
+        func_data = args[0]
+        if len(func_data) == 0:
+            resp = "请提供具体定数。"
+        else:
+            target_constant = func_data[0]
+            try:
+                target_constant = float(target_constant)
+            except:
+                resp = "您需要指明具体定数。"
+                return mh.compose_txt_msg(resp)
+
+            music_data = self._music_get(local=True)[0]
+            matching_songs = self._charts_by_constant(target_constant)
+
+            if len(matching_songs) == 0:
+                resp = f"WB没有在{target_constant}难度找到谱面。"
+            else:
+                resp = f"WB在{target_constant}找到了以下谱面：\n"
+                cnt = 1
+                for song_id in matching_songs.keys():
+                    # Bypass Utage Maps
+                    if int(song_id) > 100000:
+                        continue
+
+                    song_info = matching_songs[song_id][0]
+                    target_chart_ids = matching_songs[song_id][1]
+
+                    title = song_info["basic_info"]["title"]
+                    artist = song_info["basic_info"]["artist"]
+
+                    for chart_id in target_chart_ids:
+                        diff_short = self.DIFF_LIST_SHORT[chart_id]
+                        charter = song_info["charts"][chart_id]["charter"]
+                        resp += f"[{diff_short}] {artist} - {title} <{charter}>"
+                        resp += f" (ID{song_id})\n"
+                        cnt += 1
+
+                resp += f"共{cnt-1}张谱面。"
+
+        return mh.compose_txt_msg(resp)
+
+    # The user's Maimai Charter stat view.
+    def charter_stat_view(self, args: list) -> dict:
+        func_data = args[0]
+
+        # Didn't specify, default to 10
+        viewing_cnt = 10
+        # Specified
+        if len(func_data) != 0:
+            viewing_cnt_str = func_data[0]
+            if viewing_cnt_str.isnumeric():
+                viewing_cnt = int(viewing_cnt_str)
+                if viewing_cnt > 35:
+                    resp = "WB找到了太多结果，搬不回来了。请尝试减少数值。"
+                    return mh.compose_txt_msg(resp)
+            else:
+                resp = "请提供具体Top数值。"
+                return mh.compose_txt_msg(resp)
+
+        charter_stat = self._charts_cnt_by_charter()
+        charter_sorted = sorted(
+            charter_stat.items(), key=lambda item: item[1], reverse=True
+        )
+
+        resp = f"WB在当前版本共找到了{len(charter_stat)}位谱师：\n"
+        for i in range(viewing_cnt):
+            charter_info = charter_sorted[i]
+            charter = charter_info[0]
+            charted_cnt = charter_info[1]
+
+            resp += f"[{i+1}] {charter}: {charted_cnt}张谱面\n"
+
+        return mh.compose_txt_msg(resp)
+
+    # The user's Maimai Artist Versus tool.
+    def music_artist_vs(self, args:list) -> dict:
+        func_data = args[0]
+
+        # Blank Input
+        if len(func_data) == 0:
+            resp = "请提供作曲家。"
+            return mh.compose_txt_msg(resp)
+
+        artist = " ".join(func_data)
+
+        # Search
+        results = self._music_by_artist(artist)
+
+        # No result
+        if len(results) == 0:
+            resp = f"WB没有找到{artist}的歌曲。"
+        # Reasonable Result
+        else:
+            resp = f"如果您想大战{artist}，您可以选："
+            for i in range(len(results)):
+                song_info = results[i]
+                song_id = song_info["id"]
+
+                title = song_info["basic_info"]["title"]
+                artist = song_info["basic_info"]["artist"]
+
+                resp += f"\n[{i+1}] {artist} - {title} <ID{song_id}>"
+
+        return mh.compose_txt_msg(resp)
 
 
 class Mai_B50(object):
