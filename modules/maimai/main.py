@@ -29,7 +29,7 @@ __module_meta__ = ModuleMetadata(
     desc="Windbot Maimai Module",
     extra={
         "moduleuid": "maimai_cn",
-        "version": "0.0.1",
+        "version": "0.0.2",
         "author": ["Windsun"],
     },
 )
